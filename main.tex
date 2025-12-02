@@ -1,0 +1,200 @@
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs} % for professional tables
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2026} with \usepackage[nohyperref]{icml2026} above.
+\usepackage{hyperref}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+\usepackage{icml2026}
+
+% If accepted, instead use the following line for the camera-ready submission:
+% \usepackage[accepted]{icml2026}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\usepackage[textsize=tiny]{todonotes}
+
+\icmltitlerunning{Optimal Transport Coupled Flow Matching for Alignment-Free and Robust Multi-View Clustering}
+
+\begin{document}
+
+\twocolumn[
+  \icmltitle{Optimal Transport Coupled Flow Matching for \\
+             Alignment-Free and Robust Multi-View Clustering}
+
+  \icmlsetsymbol{equal}{*}
+
+  \begin{icmlauthorlist}
+    \icmlauthor{Anonymous Author}{equal}
+  \end{icmlauthorlist}
+
+  \icmlaffiliation{equal}{Anonymous Institution}
+
+  \icmlcorrespondingauthor{Anonymous Author}{anon@example.com}
+
+  \icmlkeywords{Multi-View Clustering, Flow Matching, Optimal Transport, Generative Models}
+
+  \vskip 0.3in
+]
+
+\printAffiliationsAndNotice{}
+
+\begin{abstract}
+Multi-view clustering (MVC) confronts dual challenges in real-world deployments: data incompleteness (missing views) and structural misalignment (unaligned samples). While Diffusion Models (DMs) have shown promise in generative imputation, their stochastic nature and iterative sampling impose high computational latency, and they inherently lack mechanisms to handle unaligned cross-view structures. We propose \textbf{Optimal Transport Coupled Flow Matching (OT-CFM)}, a unified framework that leverages the deterministic nature of continuous normalizing flows and the geometric properties of Optimal Transport. Unlike traditional methods that require explicit alignment steps or stochastic multistep generation, OT-CFM learns a Gromov-Wasserstein guided vector field that optimally transports marginal distributions of heterogeneous views toward a structurally aligned consensus centroid. This process enables deterministic, one-step view completion and alignment-free fusion simultaneously. Specifically, we introduce a structural coupling loss that regularizes the flow trajectories to preserve intra-view geometry while maximizing inter-view consistency without requiring paired samples. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that OT-CFM significantly outperforms state-of-the-art diffusion-based and traditional MVC methods in both clustering accuracy and inference efficiency.
+\end{abstract}
+
+\section{Introduction}\label{introduction}
+
+Multi-view clustering (MVC) aims to partition samples into distinct groups by integrating information from diverse modalities. Despite its success, the field is hindered by two pervasive issues: Incomplete MVC (IMVC), where views are randomly missing, and Unaligned MVC (UMVC), where sample correspondences across views are unknown. Traditional approaches often treat these as separate problems, employing distinct pipelines for imputation and alignment, which leads to error propagation and suboptimal fusion.
+
+Recently, Generative Diffusion Models (DMs) have emerged as a powerful tool for IMVC, utilizing conditional generation to recover missing views. However, DMs suffer from inherent limitations: (1) \textbf{Inference Latency}: The reliance on stochastic differential equations (SDEs) necessitates hundreds of sampling steps, prohibiting real-time applications; (2) \textbf{Alignment Dependency}: Standard conditional DMs require paired data for training, rendering them ineffective for UMVC scenarios where cross-view correspondence is absent.
+
+Flow Matching (FM) represents a paradigm shift, offering a simulation-free approach to training Continuous Normalizing Flows (CNFs). By regressing a target vector field, FM enables deterministic and efficient probability path construction. Furthermore, the theoretical connection between FM and Optimal Transport (OT) suggests a potential for learning straight, structurally optimal trajectories between distributions.
+
+Motivated by these insights, we propose a novel framework, \textbf{Optimal Transport Coupled Flow Matching (OT-CFM)}. We reformulate the MVC problem as learning a flow that minimizes the transport cost between view-specific distributions and a latent consensus distribution. Our framework incorporates three key innovations. First, we establish a \textit{Latent Coupled Flow} mechanism that maps diverse view inputs into a shared geometric space via ODEs. Second, we introduce a \textit{Gromov-Wasserstein Vector Field Regularization}, which guides the flow to align intrinsic view structures without explicit sample matching, solving the UMVC problem implicitly. Third, we employ \textit{Conditional Straight-Flow Integration}, enabling the deterministic imputation of missing views and consensus generation in limited Euler steps.
+
+This paper makes the following contributions:
+(1) We identify the limitations of stochastic diffusion in unaligned scenarios and propose the first Flow Matching-based framework for simultaneous IMVC and UMVC.
+(2) We develop a Gromov-Wasserstein guided vector field learning objective that enforces structural alignment during the flow process.
+(3) We demonstrate that OT-CFM achieves superior performance and order-of-magnitude speedups compared to diffusion baselines.
+
+\section{Related Work}\label{related-work}
+
+\textbf{Generative Models in MVC.} Deep generative models have evolved from Variational Autoencoders (VAEs) to Generative Adversarial Networks (GANs). Recently, Diffusion Models have dominated IMVC. Methods like IMVCDC utilize latent diffusion for missing view imputation, while DCG (Diffusion Contrastive Generation) employs diffusion steps to enhance clustering compactness. However, these methods are fundamentally limited by the computational cost of iterative denoising and the requirement for paired training data.
+
+\textbf{Flow Matching and Optimal Transport.} Flow Matching simplifies the training of CNFs by directly regressing vector fields. Rectified Flow and Conditional Flow Matching (CFM) further optimize transport paths to be nearly straight, facilitating fast ODE solving. Concurrently, Optimal Transport (OT) has been applied to domain adaptation and alignment. Our work bridges these fields, utilizing OT to guide the flow matching process for multi-view structural alignment.
+
+\textbf{Unaligned Multi-View Learning.} Traditional UMVC relies on combinatorial optimization to find permutation matrices or constructing large-scale similarity graphs, scaling poorly with dataset size ($O(N^2)$ or $O(N^3)$). Our method avoids explicit permutation solving by learning continuous transport maps, reducing complexity while handling misalignment.
+
+\section{Preliminaries on Flow Matching for Multi-View Clustering}\label{preliminaries}
+
+\subsection{Problem Formulation}\label{problem-formulation}
+
+Consider a dataset with $V$ views $\mathcal{X} = \{ \mathbf{X}^{(v)} \}_{v=1}^V$, where $\mathbf{X}^{(v)} \in \mathbb{R}^{N \times d_v}$. In the general setting, both missing instances (IMVC) and unknown correspondences (UMVC) may exist. The goal is to learn a partition $\mathcal{C}$ of $K$ clusters.
+
+\subsection{Flow Matching Basics}\label{flow-matching-basics}
+
+Flow Matching aims to learn a time-dependent vector field $u_t: \mathbb{R}^d \to \mathbb{R}^d$ that generates a probability path $p_t$ transforming a source distribution $p_0$ (noise) to a target distribution $p_1$ (data). The flow is defined by the ODE:
+\[
+\frac{d\mathbf{z}_t}{dt} = u_t(\mathbf{z}_t), \quad \mathbf{z}_0 \sim p_0
+\]
+The Conditional Flow Matching (CFM) objective allows training without explicit access to $p_t$ and $u_t$ by conditioning on data samples $\mathbf{x}_1 \sim p_1$:
+\[
+\mathcal{L}_{CFM}(\theta) = \mathbb{E}_{t, q(\mathbf{z}_1), p_t(\mathbf{z}|\mathbf{z}_1)} \| v_\theta(\mathbf{z}, t) - u_t(\mathbf{z}|\mathbf{z}_1) \|^2
+\]
+where $u_t(\mathbf{z}|\mathbf{z}_1)$ is the conditional vector field, typically chosen to induce a straight path $\mathbf{z}_t = t\mathbf{x}_1 + (1-t)\mathbf{x}_0$.
+
+\section{Optimal Transport Coupled Flow Matching (OT-CFM)}\label{method}
+
+We propose OT-CFM to address the structural misalignment and computational inefficiency of current methods. The framework consists of latent embedding, OT-guided vector field learning, and deterministic ODE fusion.
+
+\subsection{Latent Space Construction}\label{latent-space}
+
+We address the challenge of high-dimensional and heterogeneous multi-view data by projecting raw features into a unified low-dimensional latent space. Let $\mathcal{X} = \{ \mathbf{X}^{(v)} \in \mathbb{R}^{N \times d_v} \}_{v=1}^V$ denote the multi-view dataset with $N$ samples and $V$ views. For each view $v$, we employ a specific neural encoder $f_{\phi_v}: \mathbb{R}^{d_v} \to \mathbb{R}^{d_z}$ parameterized by $\phi_v$ to map the observation $\mathbf{x}_i^{(v)}$ to a latent representation $\mathbf{z}_i^{(v)} = f_{\phi_v}(\mathbf{x}_i^{(v)})$. This encoding process serves two primary purposes: it reduces the computational complexity of the subsequent flow matching operations by operating in a lower-dimensional manifold $d_z \ll d_v$, and it filters out modality-specific noise while preserving the intrinsic semantic structure. The resulting latent representations $\mathcal{Z} = \{ \mathbf{Z}^{(v)} \in \mathbb{R}^{N \times d_z} \}_{v=1}^V$ form the basis for our flow-based alignment and generation mechanism.
+
+\subsection{Gromov-Wasserstein Guided Vector Field}\label{gw-vector-field}
+
+In the context of Unaligned Multi-View Clustering (UMVC), the correspondence between samples across different views is unknown, rendering standard point-wise distance minimization invalid. To overcome this, we leverage the Gromov-Wasserstein (GW) distance to align the geometric structures of the view-specific distributions. We define the intra-view relational geometry using similarity matrices. Let $\mathbf{C}^{(v)} \in \mathbb{R}^{N \times N}$ and $\mathbf{C}^{(u)} \in \mathbb{R}^{N \times N}$ represent the cost matrices (e.g., cosine distance or Euclidean distance) for views $v$ and $u$ within the latent space at time $t$. The Gromov-Wasserstein discrepancy measures the structural deviation between these two metric spaces. We incorporate this discrepancy into the flow matching framework by defining a time-dependent structural regularization term. Specifically, we seek to minimize the difference between the pairwise similarity structures of the evolving latent states. The loss is formulated as the Frobenius norm of the difference between the similarity matrices of the flowing particles:
+\[
+\mathcal{L}_{GW}(\mathbf{z}_t) = \sum_{v \neq u} \sum_{i,j} \left| k(\mathbf{z}_{t,i}^{(v)}, \mathbf{z}_{t,j}^{(v)}) - k(\mathbf{z}_{t,i}^{(u)}, \mathbf{z}_{t,j}^{(u)}) \right|^2
+\]
+where $k(\cdot, \cdot)$ is a kernel function, such as the inner product or RBF kernel, defining the intra-view geometry. By differentiating this loss with respect to the particle positions $\mathbf{z}_t$, we obtain a gradient field that acts as a geometric force. This force modifies the trajectory of the vector field $v_\theta$, encouraging the flow to transport the marginal distribution of each view towards a configuration where the relational structure is consistent across all views. This effectively achieves alignment-free fusion by ensuring that samples with similar topological roles in their respective views are mapped to proximal regions in the consensus space.
+
+\subsection{Conditional Straight-Flow for Imputation}\label{conditional-flow}
+
+To address the Incomplete Multi-View Clustering (IMVC) problem, we formulate the missing view imputation as a conditional generation task within the flow matching framework. Let $\mathcal{V}_{avail}$ denote the set of indices for observed views and $\mathcal{V}_{miss}$ for missing views. We aim to learn a time-dependent vector field $v_\theta(\mathbf{z}_t, t, \mathbf{Z}_{\mathcal{V}_{avail}})$ that generates the missing latent representations $\mathbf{Z}_{\mathcal{V}_{miss}}$ conditioned on the available information. We adopt the Optimal Transport Conditional Flow Matching (OT-CFM) formulation, which constructs a probability path that optimally transports a standard Gaussian noise distribution $p_0(\mathbf{z}) = \mathcal{N}(\mathbf{0}, \mathbf{I})$ to the data distribution $p_1(\mathbf{z})$. The target conditional vector field $u_t(\mathbf{z} | \mathbf{z}_0, \mathbf{z}_1)$ is defined to generate straight trajectories between the noise sample $\mathbf{z}_0$ and the data sample $\mathbf{z}_1$:
+\[
+u_t(\mathbf{z} | \mathbf{z}_0, \mathbf{z}_1) = \mathbf{z}_1 - \mathbf{z}_0
+\]
+corresponding to the interpolation path $\mathbf{z}_t = (1 - (1 - \sigma_{min})t)\mathbf{z}_0 + t\mathbf{z}_1$. The neural vector field $v_\theta$ is trained to regress this target field. During inference, we solve the Ordinary Differential Equation (ODE) $d\mathbf{z}_t / dt = v_\theta(\mathbf{z}_t, t, \mathbf{Z}_{\mathcal{V}_{avail}})$ starting from $\mathbf{z}_0 \sim p_0$. The linearity of the OT-CFM path allows us to employ fixed-step ODE solvers, such as the Euler method, with a very small number of function evaluations (NFE), typically fewer than 10. This results in a deterministic and computationally efficient imputation process that is significantly faster than the iterative stochastic sampling required by diffusion models.
+
+\subsection{Overall Objective Function}\label{overall-objective}
+
+The training of the OT-CFM framework is governed by a unified objective function that integrates flow matching accuracy, structural alignment, and clustering compactness. The primary component is the Conditional Flow Matching loss, which ensures the learned vector field $v_\theta$ approximates the optimal transport path:
+\[
+\mathcal{L}_{CFM}(\theta) = \mathbb{E}_{t \sim [0,1], \mathbf{z}_0 \sim p_0, \mathbf{z}_1 \sim p_1} \left[ \| v_\theta(\psi_t(\mathbf{z}_0, \mathbf{z}_1), t) - (\mathbf{z}_1 - \mathbf{z}_0) \|^2 \right]
+\]
+where $\psi_t(\mathbf{z}_0, \mathbf{z}_1)$ is the linear interpolation path. To enforce geometric consistency across unaligned views, we incorporate the Gromov-Wasserstein regularization $\mathcal{L}_{GW}$ as defined previously. Furthermore, to enhance the separability of the generated latent representations for clustering, we introduce a clustering-oriented loss $\mathcal{L}_{Cluster}$. This term typically employs a contrastive mechanism or a Kullback-Leibler divergence penalty against a target distribution $Q$ derived from Student's t-distribution, sharpening the cluster assignments:
+\[
+\mathcal{L}_{Cluster} = KL(P \| Q) = \sum_{i} \sum_{k} p_{ik} \log \frac{p_{ik}}{q_{ik}}
+\]
+where $q_{ik}$ is the soft assignment probability and $p_{ik}$ is the target auxiliary distribution. The total objective is a weighted sum of these components:
+\[
+\mathcal{L}_{Total} = \mathcal{L}_{CFM} + \lambda_{gw} \mathcal{L}_{GW} + \lambda_{c} \mathcal{L}_{Cluster}
+\]
+where $\lambda_{gw}$ and $\lambda_{c}$ are hyperparameters balancing the trade-off between trajectory learning, structural alignment, and cluster structure preservation.
+
+\subsection{Optimization Procedure}\label{optimization}
+
+Directly optimizing the joint objective $\mathcal{L}_{Total}$ is challenging due to the coupling between the flow matching dynamics, the structural alignment, and the discrete nature of clustering assignments. To address this, we propose an Alternating Minimization (AM) scheme. This approach decouples the optimization of the neural vector field parameters $\theta$ and the clustering auxiliary variables (target distribution $P$ and centroids $\mathbf{M}$).
+
+The optimization process iterates between two main steps:
+\textbf{Step 1: Clustering Update.} Fixing the network parameters $\theta$, we update the soft assignment distribution $Q$ based on the current latent embeddings $\mathbf{Z}$ and cluster centroids $\mathbf{M}$. Subsequently, we compute the auxiliary target distribution $P$ which sharpens the high-confidence assignments to promote cluster purity. This step can be viewed as a generalized Expectation-Maximization (EM) step.
+
+\textbf{Step 2: Network Update.} Fixing the target distribution $P$, we optimize the vector field parameters $\theta$ via stochastic gradient descent (SGD). In this phase, the model learns to generate trajectories that not only satisfy the boundary conditions of the flow (via $\mathcal{L}_{CFM}$) and preserve cross-view geometry (via $\mathcal{L}_{GW}$), but also align the latent particles with the updated cluster structures (via $\mathcal{L}_{Cluster}$).
+
+This alternating procedure ensures stable convergence. The complete training process is summarized in Algorithm \ref{alg:ot_cfm}.
+
+\begin{algorithm}[tb]
+  \caption{Alternating Optimization for OT-CFM}
+  \label{alg:ot_cfm}
+  \begin{algorithmic}
+    \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_{gw}, \lambda_{c}$.
+    \STATE {\bfseries Initialize:} Vector field network parameters $\theta$, Cluster centroids $\mathbf{M}$ via K-Means on initial embeddings.
+    \REPEAT
+    \STATE \textbf{--- E-Step: Update Clustering Variables ---}
+    \STATE Compute latent embeddings $\mathbf{Z}^{(v)} = \text{ODE\_Solve}(v_\theta, \mathbf{X}^{(v)})$ for all samples.
+    \STATE Compute soft assignments $q_{ik}$ using Student's t-kernel on $\mathbf{Z}$ and $\mathbf{M}$.
+    \STATE Compute target distribution $p_{ik} \propto q_{ik}^2 / \sum_i q_{ik}$.
+    \STATE \textbf{--- M-Step: Update Network Parameters ---}
+    \FOR{each mini-batch $\mathcal{B} \subset \mathcal{X}$}
+        \STATE Sample time $t \sim \mathcal{U}[0,1]$ and noise $\mathbf{z}_0 \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$.
+        \STATE Compute Flow Matching Loss $\mathcal{L}_{CFM}$ on batch $\mathcal{B}$.
+        \STATE Compute GW Alignment Loss $\mathcal{L}_{GW}$ on batch $\mathcal{B}$.
+        \STATE Compute Clustering Loss $\mathcal{L}_{Cluster} = KL(P_{\mathcal{B}} \| Q_{\mathcal{B}})$.
+        \STATE Update $\theta \leftarrow \theta - \eta \nabla_\theta (\mathcal{L}_{CFM} + \lambda_{gw} \mathcal{L}_{GW} + \lambda_{c} \mathcal{L}_{Cluster})$.
+    \ENDFOR
+    \STATE Update centroids $\mathbf{M}$ based on new embeddings.
+    \UNTIL{Convergence}
+    \STATE {\bfseries Output:} Optimized parameters $\theta$, Cluster assignments.
+  \end{algorithmic}
+\end{algorithm}
+
+
+\bibliography{ref}
+\bibliographystyle{icml2026}
+
+\end{document}
