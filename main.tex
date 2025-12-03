@@ -171,6 +171,8 @@ Note that in our implementation, the GW loss is computed on the encoded latent r
 
 \textbf{Computational Complexity.} While GW distance computation scales quadratically with sample size, we compute it within mini-batches of size $B$, yielding $O(B^2)$ per batch. Since our goal is to align the \textit{manifold geometry} rather than global point-wise matching, batch-wise structural alignment provides a sufficient gradient signal for the encoders while maintaining linear complexity $O(N)$ with respect to the total dataset size.
 
+\textbf{Batch Size Considerations.} The effectiveness of batch-wise GW alignment depends on having sufficiently diverse samples within each batch to capture meaningful geometric structure. We recommend $B \geq 128$ for stable training. In our experiments, we use $B = 256$ by default. For datasets with many fine-grained clusters, larger batch sizes or stratified sampling may be beneficial to ensure adequate cluster representation within each batch.
+
 \subsection{Conditional Straight-Flow for Imputation}\label{conditional-flow}
 
 To address the Incomplete Multi-View Clustering (IMVC) problem, we formulate the missing view imputation as a conditional generation task within the flow matching framework. Let $\mathcal{V}_{avail}$ denote the set of indices for observed views and $\mathcal{V}_{miss}$ for missing views. We aim to learn a time-dependent vector field $v_\theta(\mathbf{z}_t, t, \mathbf{c})$ that generates the missing latent representations conditioned on a conditioning vector $\mathbf{c}$.
@@ -180,6 +182,8 @@ To address the Incomplete Multi-View Clustering (IMVC) problem, we formulate the
     \item \textbf{Aligned (IMVC):} $\mathbf{c} = \mathbf{z}^{(c)}$, the consensus computed from available views.
     \item \textbf{Unaligned (UMVC):} $\mathbf{c} = \boldsymbol{\mu}_{k^*}$, the nearest cluster centroid based on available view latents.
 \end{itemize}
+
+\textbf{Remark on Instance Specificity.} In the unaligned setting, conditioning on cluster centroids $\boldsymbol{\mu}_{k^*}$ rather than instance-specific features means that imputed views represent \textit{prototypical} samples of the assigned cluster, not pixel-accurate reconstructions of the original instance. This is an inherent property of unaligned imputation: without cross-view correspondence, instance-level recovery is fundamentally impossible. However, for the downstream \textit{clustering} task, semantic correctness (i.e., assigning samples to the correct cluster) matters more than visual fidelity. Our framework prioritizes clustering accuracy over reconstruction quality, which is the appropriate objective for UMVC.
 
 \textbf{Imputation Procedure.} During inference, for samples with missing views, we:
 \begin{enumerate}
@@ -275,6 +279,8 @@ Directly optimizing the joint objective $\mathcal{L}_{Total}$ is challenging due
     \item \textbf{Warm-up Phase:} We first train the encoder-decoder using only $\mathcal{L}_{Recon}$ for a few epochs to establish a stable latent space. Then, we collect all latent embeddings and initialize cluster centroids using K-Means on the normalized embeddings. This warm-up is crucial for unaligned scenarios where initial centroid quality directly affects flow training.
     \item \textbf{Joint Training Phase:} We perform end-to-end optimization of all network parameters using the combined loss $\mathcal{L}_{Total}$. The cluster centroids are treated as learnable parameters updated via gradient descent. Periodically (every few epochs), we refine the centroids using K-Means on the current embeddings to prevent degenerate solutions.
 \end{enumerate}
+
+\textbf{Mitigating Mode Collapse.} The cold-start problem poses a risk of mode collapse in unaligned settings: poor initial centroids lead to poor conditioning, which in turn degrades latent representations. We address this through: (1) the warm-up phase that establishes meaningful representations before introducing centroid-conditioned flow; (2) periodic K-Means refinement that corrects drifting centroids; and (3) the GW loss that provides centroid-independent structural guidance. We empirically validate these design choices in our ablation studies.
 
 \textbf{Implementation Details.} We use the Adam optimizer with learning rate $10^{-3}$ and apply gradient clipping with max norm 1.0 to stabilize training. The ODE solver employs the Euler method with 10 integration steps for efficiency. During inference, cluster assignments are obtained by taking the argmax of the soft assignment probabilities.
 
