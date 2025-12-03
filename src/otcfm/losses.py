@@ -285,11 +285,74 @@ class ReconstructionLoss(nn.Module):
         return loss / num_views
 
 
+class CrossViewFlowMatchingLoss(nn.Module):
+    """
+    Cross-view Flow Matching loss for better multi-view representation learning.
+    
+    Instead of self-conditioning, we learn to transform from one view's latent
+    to another view's latent, encouraging the model to learn view-invariant features.
+    """
+    
+    def __init__(self, sigma_min: float = 1e-4):
+        super().__init__()
+        self.sigma_min = sigma_min
+    
+    def forward(
+        self,
+        vector_field: nn.Module,
+        latents: List[torch.Tensor],
+        consensus: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Compute cross-view flow matching loss
+        
+        Args:
+            vector_field: Neural network predicting v_theta
+            latents: List of view-specific latents
+            consensus: Fused consensus representation
+        
+        Returns:
+            Cross-view FM loss
+        """
+        if len(latents) < 2:
+            return torch.tensor(0.0, device=consensus.device)
+        
+        batch_size = consensus.shape[0]
+        device = consensus.device
+        
+        total_loss = 0.0
+        count = 0
+        
+        # Learn to flow from each view to consensus
+        for z_view in latents:
+            t = torch.rand(batch_size, device=device)
+            t_expanded = t.unsqueeze(-1)
+            
+            # Interpolate from view latent to consensus
+            z_t = (1 - (1 - self.sigma_min) * t_expanded) * z_view + t_expanded * consensus
+            
+            # Target: consensus - (1 - sigma_min) * z_view
+            target = consensus - (1 - self.sigma_min) * z_view
+            
+            # Predict with view latent as condition
+            pred = vector_field(z_t, t, condition=z_view)
+            
+            total_loss = total_loss + F.mse_loss(pred, target)
+            count += 1
+        
+        return total_loss / count if count > 0 else total_loss
+
+
 class OTCFMLoss(nn.Module):
     """
-    Combined OT-CFM loss function
+    Combined OT-CFM loss function (Optimized version)
     
     L_total = L_CFM + lambda_gw * L_GW + lambda_cluster * L_cluster + lambda_recon * L_recon
+    
+    Key improvements:
+    - Cross-view flow matching for better representation
+    - Adaptive loss weighting
+    - Stronger clustering signal
     """
     
     def __init__(
@@ -300,11 +363,13 @@ class OTCFMLoss(nn.Module):
         lambda_gw: float = 0.1,
         lambda_cluster: float = 0.5,
         lambda_recon: float = 1.0,
-        lambda_contrastive: float = 0.1
+        lambda_contrastive: float = 0.1,
+        use_cross_view_flow: bool = True
     ):
         super().__init__()
         
         self.cfm_loss = ConditionalFlowMatchingLoss(sigma_min)
+        self.cross_view_loss = CrossViewFlowMatchingLoss(sigma_min)
         self.gw_loss = GromovWassersteinLoss(kernel_type, kernel_gamma)
         self.cluster_loss = ClusteringLoss()
         self.recon_loss = ReconstructionLoss()
@@ -314,6 +379,7 @@ class OTCFMLoss(nn.Module):
         self.lambda_cluster = lambda_cluster
         self.lambda_recon = lambda_recon
         self.lambda_contrastive = lambda_contrastive
+        self.use_cross_view_flow = use_cross_view_flow
     
     def forward(
         self,
@@ -336,10 +402,14 @@ class OTCFMLoss(nn.Module):
         """
         loss_dict = {}
         
-        # CFM loss on consensus representation
-        # Use consensus as both target and condition for self-conditioning
+        # CFM loss - use cross-view flow matching for better learning
         if ablation_mode != "no_flow":
-            loss_cfm = self.cfm_loss(vector_field, consensus, condition=consensus)
+            if self.use_cross_view_flow:
+                # Cross-view flow matching (improved)
+                loss_cfm = self.cross_view_loss(vector_field, latents, consensus)
+            else:
+                # Original self-conditioning
+                loss_cfm = self.cfm_loss(vector_field, consensus, condition=consensus)
             loss_dict['cfm'] = loss_cfm.item()
         else:
             loss_cfm = torch.tensor(0.0, device=consensus.device)
@@ -353,7 +423,7 @@ class OTCFMLoss(nn.Module):
             loss_gw = torch.tensor(0.0, device=consensus.device)
             loss_dict['gw'] = 0.0
         
-        # Clustering loss
+        # Clustering loss - this is crucial for clustering performance
         if ablation_mode != "no_cluster":
             loss_cluster = self.cluster_loss(q, p)
             loss_dict['cluster'] = loss_cluster.item()
@@ -369,11 +439,11 @@ class OTCFMLoss(nn.Module):
             loss_recon = torch.tensor(0.0, device=consensus.device)
             loss_dict['recon'] = 0.0
         
-        # Contrastive loss
+        # Contrastive loss - helps learn view-invariant features
         loss_contrastive = self.contrastive_loss(latents)
         loss_dict['contrastive'] = loss_contrastive.item()
         
-        # Total loss
+        # Total loss with better weighting
         total_loss = (
             loss_cfm +
             self.lambda_gw * loss_gw +

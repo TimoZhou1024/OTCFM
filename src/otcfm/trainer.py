@@ -9,6 +9,7 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from typing import Dict, Optional, List, Tuple
 from pathlib import Path
@@ -99,7 +100,8 @@ class Trainer:
         labels: np.ndarray,
         val_loader: Optional[DataLoader] = None,
         val_labels: Optional[np.ndarray] = None,
-        ablation_mode: str = "full"
+        ablation_mode: str = "full",
+        pretrain_epochs: int = 20  # 预训练轮数
     ) -> Dict:
         """
         Full training loop with alternating optimization
@@ -110,11 +112,68 @@ class Trainer:
             val_loader: Optional validation loader
             val_labels: Optional validation labels
             ablation_mode: Ablation setting
+            pretrain_epochs: Number of pretraining epochs for encoder-decoder
         
         Returns:
             Final metrics dictionary
         """
-        # Initialize clustering centroids
+        # Phase 1: Pretrain encoder-decoder (重建任务)
+        if pretrain_epochs > 0:
+            print(f"Pretraining encoder-decoder for {pretrain_epochs} epochs...")
+            for epoch in range(pretrain_epochs):
+                self.model.train()
+                total_recon_loss = 0
+                num_batches = 0
+                
+                for batch in train_loader:
+                    views = [v.to(self.device) for v in batch['views']]
+                    mask = batch['mask'].to(self.device)
+                    
+                    self.optimizer.zero_grad()
+                    
+                    # Only compute reconstruction loss
+                    outputs = self.model(views, mask, return_all=True)
+                    
+                    recon_loss = 0
+                    for v_idx in range(len(views)):
+                        recon_loss += F.mse_loss(
+                            outputs['reconstructions'][v_idx], 
+                            views[v_idx]
+                        )
+                    recon_loss = recon_loss / len(views)
+                    
+                    # Add contrastive loss to learn good representations
+                    latents = outputs['latents']
+                    contrastive_loss = 0
+                    count = 0
+                    for i in range(len(latents)):
+                        for j in range(i + 1, len(latents)):
+                            z_i = F.normalize(latents[i], dim=-1)
+                            z_j = F.normalize(latents[j], dim=-1)
+                            pos_sim = (z_i * z_j).sum(dim=-1).mean()
+                            contrastive_loss -= pos_sim
+                            count += 1
+                    if count > 0:
+                        contrastive_loss = contrastive_loss / count
+                    
+                    loss = recon_loss + 0.5 * contrastive_loss
+                    loss.backward()
+                    
+                    if self.config.clip_grad_norm > 0:
+                        torch.nn.utils.clip_grad_norm_(
+                            self.model.parameters(),
+                            self.config.clip_grad_norm
+                        )
+                    
+                    self.optimizer.step()
+                    total_recon_loss += recon_loss.item()
+                    num_batches += 1
+                
+                if (epoch + 1) % 5 == 0:
+                    avg_loss = total_recon_loss / num_batches
+                    print(f"  Pretrain epoch {epoch+1}/{pretrain_epochs}, Recon Loss: {avg_loss:.4f}")
+        
+        # Initialize clustering centroids after pretraining
         print("Initializing clustering centroids...")
         self.model.init_clustering(train_loader, self.device)
         
@@ -227,16 +286,24 @@ class Trainer:
         """Update clustering centroids (E-step)"""
         self.model.eval()
         all_embeddings = []
+        all_indices = []
         
         with torch.no_grad():
             for batch in dataloader:
                 views = [v.to(self.device) for v in batch['views']]
                 mask = batch['mask'].to(self.device)
+                indices = batch['indices']
                 
                 outputs = self.model(views, mask)
                 all_embeddings.append(outputs['consensus'])
+                all_indices.append(indices)
         
         all_embeddings = torch.cat(all_embeddings, dim=0)
+        all_indices = torch.cat(all_indices, dim=0).numpy()
+        
+        # 按原始顺序排序
+        order = np.argsort(all_indices)
+        all_embeddings = all_embeddings[order]
         
         # Update centroids using K-Means
         from sklearn.cluster import KMeans
@@ -254,17 +321,26 @@ class Trainer:
         self.model.eval()
         all_embeddings = []
         all_predictions = []
+        all_indices = []
         
         for batch in dataloader:
             views = [v.to(self.device) for v in batch['views']]
             mask = batch['mask'].to(self.device)
+            indices = batch['indices']  # 获取样本索引
             
             outputs = self.model(views, mask)
             all_embeddings.append(outputs['consensus'].cpu())
             all_predictions.append(outputs['assignments'].cpu())
+            all_indices.append(indices)
         
         embeddings = torch.cat(all_embeddings, dim=0).numpy()
         predictions = torch.cat(all_predictions, dim=0).numpy()
+        indices = torch.cat(all_indices, dim=0).numpy()
+        
+        # 按原始顺序排序，确保与 labels 对应
+        order = np.argsort(indices)
+        embeddings = embeddings[order]
+        predictions = predictions[order]
         
         metrics = evaluate_clustering(labels, predictions, embeddings)
         return metrics

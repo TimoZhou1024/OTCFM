@@ -43,11 +43,12 @@ class OTCFM(nn.Module):
         sigma_min: float = 1e-4,
         kernel_type: str = "rbf",
         kernel_gamma: float = 1.0,
-        lambda_gw: float = 0.1,
-        lambda_cluster: float = 0.5,
-        lambda_recon: float = 1.0,
-        lambda_contrastive: float = 0.1,
-        dropout: float = 0.1
+        lambda_gw: float = 0.2,        # 增加 GW 对齐损失
+        lambda_cluster: float = 1.0,   # 显著增加聚类损失权重
+        lambda_recon: float = 0.5,     # 减少重建损失
+        lambda_contrastive: float = 0.3,  # 增加对比学习
+        dropout: float = 0.1,
+        use_cross_view_flow: bool = True  # 使用跨视图流匹配
     ):
         super().__init__()
         
@@ -84,7 +85,7 @@ class OTCFM(nn.Module):
         # Clustering module
         self.clustering = ClusteringModule(latent_dim, num_clusters)
         
-        # Loss function
+        # Loss function with optimized weights
         self.loss_fn = OTCFMLoss(
             sigma_min=sigma_min,
             kernel_type=kernel_type,
@@ -92,7 +93,8 @@ class OTCFM(nn.Module):
             lambda_gw=lambda_gw,
             lambda_cluster=lambda_cluster,
             lambda_recon=lambda_recon,
-            lambda_contrastive=lambda_contrastive
+            lambda_contrastive=lambda_contrastive,
+            use_cross_view_flow=use_cross_view_flow
         )
         
         # Store hyperparameters
@@ -305,16 +307,25 @@ class OTCFM(nn.Module):
         """
         self.eval()
         all_embeddings = []
+        all_indices = []
         
         with torch.no_grad():
             for batch in dataloader:
                 views = [v.to(device) for v in batch['views']]
                 mask = batch['mask'].to(device)
+                indices = batch['indices']
                 
                 outputs = self.forward(views, mask)
                 all_embeddings.append(outputs['consensus'].cpu())
+                all_indices.append(indices)
         
         all_embeddings = torch.cat(all_embeddings, dim=0)
+        all_indices = torch.cat(all_indices, dim=0).numpy()
+        
+        # 按原始顺序排序
+        order = np.argsort(all_indices)
+        all_embeddings = all_embeddings[order]
+        
         self.clustering.init_centroids(all_embeddings)
         self.clustering.centroids = self.clustering.centroids.to(device)
 
@@ -384,16 +395,24 @@ class OTCFMTrainer:
         """Update clustering centroids (E-step of alternating optimization)"""
         self.model.eval()
         all_embeddings = []
+        all_indices = []
         
         with torch.no_grad():
             for batch in dataloader:
                 views = [v.to(self.device) for v in batch['views']]
                 mask = batch['mask'].to(self.device)
+                indices = batch['indices']
                 
                 outputs = self.model(views, mask)
                 all_embeddings.append(outputs['consensus'])
+                all_indices.append(indices)
         
         all_embeddings = torch.cat(all_embeddings, dim=0)
+        all_indices = torch.cat(all_indices, dim=0).numpy()
+        
+        # 按原始顺序排序
+        order = np.argsort(all_indices)
+        all_embeddings = all_embeddings[order]
         
         # Update centroids using current embeddings
         from sklearn.cluster import KMeans
@@ -413,17 +432,26 @@ class OTCFMTrainer:
         self.model.eval()
         all_embeddings = []
         all_predictions = []
+        all_indices = []
         
         for batch in dataloader:
             views = [v.to(self.device) for v in batch['views']]
             mask = batch['mask'].to(self.device)
+            indices = batch['indices']
             
             outputs = self.model(views, mask)
             all_embeddings.append(outputs['consensus'].cpu())
             all_predictions.append(outputs['assignments'].cpu())
+            all_indices.append(indices)
         
         embeddings = torch.cat(all_embeddings, dim=0).numpy()
         predictions = torch.cat(all_predictions, dim=0).numpy()
+        indices = torch.cat(all_indices, dim=0).numpy()
+        
+        # 按原始顺序排序，确保与 labels 对应
+        order = np.argsort(indices)
+        embeddings = embeddings[order]
+        predictions = predictions[order]
         
         metrics = evaluate_clustering(labels, predictions, embeddings)
         return metrics

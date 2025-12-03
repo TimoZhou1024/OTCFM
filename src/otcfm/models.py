@@ -7,6 +7,7 @@ OT-CFM Model Components:
 """
 
 import math
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -32,7 +33,7 @@ class SinusoidalTimeEmbedding(nn.Module):
 
 
 class MLPEncoder(nn.Module):
-    """MLP encoder for a single view"""
+    """MLP encoder for a single view with skip connection"""
     
     def __init__(
         self,
@@ -52,15 +53,24 @@ class MLPEncoder(nn.Module):
             if use_bn:
                 layers.append(nn.BatchNorm1d(hidden_dim))
             layers.append(nn.ReLU(inplace=True))
-            layers.append(nn.Dropout(dropout))
+            if dropout > 0:
+                layers.append(nn.Dropout(dropout))
             prev_dim = hidden_dim
         
         layers.append(nn.Linear(prev_dim, output_dim))
         
         self.encoder = nn.Sequential(*layers)
+        
+        # Skip connection if dimensions allow
+        self.skip = nn.Linear(input_dim, output_dim) if input_dim != output_dim else nn.Identity()
+        self.use_skip = True
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.encoder(x)
+        out = self.encoder(x)
+        if self.use_skip:
+            # Add skip connection scaled down to not dominate
+            out = out + 0.1 * self.skip(x)
+        return out
 
 
 class MLPDecoder(nn.Module):
@@ -327,6 +337,7 @@ class MultiViewEncoderDecoder(nn.Module):
 class ClusteringModule(nn.Module):
     """
     Clustering module using Student's t-distribution
+    With proper normalization for stable training
     """
     
     def __init__(self, latent_dim: int, num_clusters: int, alpha: float = 1.0):
@@ -334,9 +345,10 @@ class ClusteringModule(nn.Module):
         
         self.num_clusters = num_clusters
         self.alpha = alpha
+        self.latent_dim = latent_dim
         
         # Learnable cluster centroids
-        self.centroids = nn.Parameter(torch.randn(num_clusters, latent_dim))
+        self.centroids = nn.Parameter(torch.randn(num_clusters, latent_dim) * 0.1)
     
     def forward(self, z: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -349,14 +361,17 @@ class ClusteringModule(nn.Module):
             q: Soft assignments [B, K]
             p: Target distribution [B, K]
         """
-        # Compute distances to centroids
-        # z: [B, D], centroids: [K, D]
-        dist = torch.cdist(z, self.centroids)  # [B, K]
+        # Normalize both z and centroids for stable distance computation
+        z_norm = F.normalize(z, dim=-1)
+        c_norm = F.normalize(self.centroids, dim=-1)
         
-        # Student's t-distribution
-        q = 1.0 / (1.0 + (dist ** 2) / self.alpha)
-        q = q ** ((self.alpha + 1.0) / 2.0)
-        q = q / q.sum(dim=1, keepdim=True)
+        # Cosine similarity based distance (more stable)
+        sim = z_norm @ c_norm.T  # [B, K], range [-1, 1]
+        
+        # Convert to soft assignments
+        # Higher temperature for softer assignments initially
+        temperature = 0.1
+        q = F.softmax(sim / temperature, dim=-1)
         
         # Compute target distribution P
         p = self._target_distribution(q)
@@ -369,19 +384,26 @@ class ClusteringModule(nn.Module):
         high confidence assignments
         """
         # p_ik = q_ik^2 / sum_i(q_ik)
-        weight = q ** 2 / q.sum(dim=0, keepdim=True)
-        p = weight / weight.sum(dim=1, keepdim=True)
+        weight = q ** 2 / (q.sum(dim=0, keepdim=True) + 1e-8)
+        p = weight / (weight.sum(dim=1, keepdim=True) + 1e-8)
         return p
     
     def init_centroids(self, z: torch.Tensor, method: str = "kmeans"):
         """Initialize centroids from data"""
         from sklearn.cluster import KMeans
         
+        # Normalize embeddings before clustering
         z_np = z.detach().cpu().numpy()
-        kmeans = KMeans(n_clusters=self.num_clusters, n_init=20, random_state=42)
-        kmeans.fit(z_np)
+        z_norm = z_np / (np.linalg.norm(z_np, axis=1, keepdims=True) + 1e-8)
         
-        self.centroids.data = torch.FloatTensor(kmeans.cluster_centers_).to(z.device)
+        kmeans = KMeans(n_clusters=self.num_clusters, n_init=20, random_state=42)
+        kmeans.fit(z_norm)
+        
+        # Store normalized centroids
+        centers = kmeans.cluster_centers_
+        centers = centers / (np.linalg.norm(centers, axis=1, keepdims=True) + 1e-8)
+        
+        self.centroids.data = torch.FloatTensor(centers).to(z.device)
     
     def get_assignments(self, z: torch.Tensor) -> torch.Tensor:
         """Get hard cluster assignments"""
