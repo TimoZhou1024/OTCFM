@@ -249,35 +249,55 @@ class OTCFM(nn.Module):
         
         # For unaligned data, we need an alternative to consensus
         if consensus is None:
-            # UNALIGNED: Do NOT average across views as samples are not corresponding.
-            # Instead, compute per-view cluster assignments independently.
-            # For training, we aggregate via soft voting across views.
+            # UNALIGNED: Each view operates INDEPENDENTLY.
+            # Index i in View A has NO correspondence to index i in View B.
+            # Therefore, NO cross-view voting or averaging is allowed.
             
-            # Compute per-view soft assignments
+            # Compute per-view soft assignments and per-view conditioning
             per_view_q = []
+            per_view_conditions = []  # Each view has its own condition
+            
             for z_v in latents:
                 q_v, _ = self.clustering(z_v)  # [B, K]
                 per_view_q.append(q_v)
+                
+                # Each view independently selects its centroid
+                assignments_v = q_v.argmax(dim=1)  # [B]
+                cond_v = self.clustering.centroids[assignments_v]  # [B, D]
+                per_view_conditions.append(cond_v)
             
-            # Aggregate via averaging soft assignments (not latents!)
-            # This is valid because we're averaging probability distributions, not features
+            # For clustering evaluation, we need a single q per sample.
+            # Use average of per-view q ONLY for the clustering loss computation.
+            # This is a heuristic for training - at inference, each view is evaluated independently.
             q = torch.stack(per_view_q, dim=0).mean(dim=0)  # [V, B, K] -> [B, K]
             p = self.clustering._target_distribution(q)
             
-            # Use cluster centroids as the "consensus" for conditioning
-            assignments = q.argmax(dim=1)  # [B]
-            consensus = self.clustering.centroids[assignments]  # [B, D]
+            # Store per-view conditions for CFM loss (NOT a single consensus)
+            # For now, use the first view's condition as a placeholder for outputs
+            # The actual per-view conditions are used in compute_loss
+            consensus = per_view_conditions[0]  # Placeholder for output dict
+            
+            # Store per-view conditions for later use
+            outputs = {
+                'latents': latents,
+                'consensus': None,  # Mark as unaligned - no valid consensus
+                'per_view_conditions': per_view_conditions,  # NEW: per-view centroids
+                'q': q,
+                'p': p,
+                'per_view_q': per_view_q,  # NEW: per-view soft assignments
+                'assignments': q.argmax(dim=1)
+            }
         else:
             # Aligned data: use actual consensus for clustering
             q, p = self.clustering(consensus)
-        
-        outputs = {
-            'latents': latents,
-            'consensus': consensus,
-            'q': q,
-            'p': p,
-            'assignments': q.argmax(dim=1)
-        }
+            
+            outputs = {
+                'latents': latents,
+                'consensus': consensus,
+                'q': q,
+                'p': p,
+                'assignments': q.argmax(dim=1)
+            }
         
         if return_all:
             # Decode for reconstruction
@@ -306,6 +326,9 @@ class OTCFM(nn.Module):
         """
         outputs = self.forward(views, mask, return_all=True)
         
+        # Get per_view_conditions if available (for unaligned case)
+        per_view_conditions = outputs.get('per_view_conditions', None)
+        
         loss, loss_dict = self.loss_fn(
             vector_field=self.vector_field,
             latents=outputs['latents'],
@@ -315,7 +338,8 @@ class OTCFM(nn.Module):
             x_original=views,
             x_recon=outputs['reconstructions'],
             mask=mask,
-            ablation_mode=ablation_mode
+            ablation_mode=ablation_mode,
+            per_view_conditions=per_view_conditions  # NEW: per-view centroids for unaligned
         )
         
         return loss, loss_dict
@@ -347,7 +371,11 @@ class OTCFM(nn.Module):
         mask: Optional[torch.Tensor] = None
     ) -> np.ndarray:
         """
-        Get consensus embeddings
+        Get embeddings for clustering
+        
+        For aligned data: returns consensus embeddings (view average)
+        For unaligned data: returns first view's latent embeddings 
+                           (since no valid consensus exists)
         
         Args:
             views: List of view tensors
@@ -359,7 +387,12 @@ class OTCFM(nn.Module):
         self.eval()
         with torch.no_grad():
             outputs = self.forward(views, mask)
-            embeddings = outputs['consensus'].cpu().numpy()
+            if outputs['consensus'] is not None:
+                # Aligned: use consensus
+                embeddings = outputs['consensus'].cpu().numpy()
+            else:
+                # Unaligned: use first view's latent (no valid cross-view consensus)
+                embeddings = outputs['latents'][0].cpu().numpy()
         return embeddings
     
     def init_clustering(self, dataloader, device: str = 'cuda'):

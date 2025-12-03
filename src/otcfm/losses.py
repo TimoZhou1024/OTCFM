@@ -467,7 +467,8 @@ class OTCFMLoss(nn.Module):
         x_recon: Optional[List[torch.Tensor]] = None,
         mask: Optional[torch.Tensor] = None,
         ablation_mode: str = "full",
-        cluster_centers: Optional[torch.Tensor] = None  # For unaligned: use as CFM condition
+        cluster_centers: Optional[torch.Tensor] = None,  # Deprecated, use per_view_conditions
+        per_view_conditions: Optional[List[torch.Tensor]] = None  # NEW: per-view centroids for unaligned
     ) -> Tuple[torch.Tensor, dict]:
         """
         Compute total OT-CFM loss
@@ -482,7 +483,9 @@ class OTCFMLoss(nn.Module):
             x_recon: Reconstructed data
             mask: Missing view mask
             ablation_mode: Ablation study mode
-            cluster_centers: Cluster centers (used as condition when consensus is None)
+            cluster_centers: Deprecated - cluster centers
+            per_view_conditions: Per-view centroid conditions for UMVC (unaligned)
+                                 Each view v has its own condition c^{(v)} based on its own assignment
         
         Returns:
             total_loss: Combined loss
@@ -492,18 +495,27 @@ class OTCFMLoss(nn.Module):
         device = latents[0].device
         
         # CFM loss - always active, but conditioning source differs
-        # Aligned: condition on consensus (view average)
-        # Unaligned: condition on cluster centroids (consensus is actually centroids here)
+        # Aligned: condition on consensus (view average) - single condition for all views
+        # Unaligned: each view has its OWN condition (no cross-view operations!)
         if ablation_mode != "no_flow":
-            if consensus is not None:
-                if self.is_aligned and self.use_cross_view_flow:
-                    # Aligned: auxiliary cross-view flow (view → consensus)
+            if self.is_aligned and consensus is not None:
+                # ALIGNED: All views condition on the same consensus
+                if self.use_cross_view_flow:
+                    # Auxiliary cross-view flow (view → consensus)
                     loss_cfm = self.cross_view_loss(vector_field, latents, consensus)
                 else:
-                    # Both aligned and unaligned use generative CFM
-                    # For aligned: condition = consensus; For unaligned: condition = centroid
-                    # The "consensus" passed in unaligned case is actually the cluster centroid
+                    # Generative CFM: condition = consensus
                     loss_cfm = self.cfm_loss(vector_field, consensus, condition=consensus)
+            elif per_view_conditions is not None:
+                # UNALIGNED: Each view has its own condition!
+                # This is critical: index i in view A ≠ index i in view B
+                # So we compute CFM loss per-view with per-view conditions
+                cfm_losses = []
+                for v, (z_v, cond_v) in enumerate(zip(latents, per_view_conditions)):
+                    # Each view v: flow from noise to z_v, conditioned on c^{(v)}
+                    loss_v = self.cfm_loss(vector_field, z_v, condition=cond_v)
+                    cfm_losses.append(loss_v)
+                loss_cfm = torch.stack(cfm_losses).mean()  # Average across views (not samples!)
             else:
                 loss_cfm = torch.tensor(0.0, device=device)
             loss_dict['cfm'] = loss_cfm.item()
@@ -511,7 +523,7 @@ class OTCFMLoss(nn.Module):
             loss_cfm = torch.tensor(0.0, device=device)
             loss_dict['cfm'] = 0.0
         
-        # GW alignment loss
+        # GW alignment loss - still valid for structure preservation
         if ablation_mode not in ["no_gw", "no_ot"]:
             loss_gw = self.gw_loss(latents)
             loss_dict['gw'] = loss_gw.item()

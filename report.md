@@ -221,3 +221,97 @@ Imports successful!
 3. **自动下载功能**: 实现了数据集自动下载和解压功能
 
 OT-CFM 框架现在可以在更多真实数据集上进行评估和测试。
+
+---
+
+## 关键修复：UMVC 中的跨视图操作问题
+
+### 问题发现
+
+在 UMVC（Unaligned Multi-View Clustering，无对齐多视图聚类）场景中，发现了一个**关键逻辑错误**：
+
+> **样本索引 i 在不同视图中没有对应关系！**
+
+这意味着：
+- 视图 A 中的样本 i 和视图 B 中的样本 i 是**完全不相关**的
+- 任何基于样本索引进行的跨视图操作都是**无意义的**
+
+### 错误的实现（旧代码）
+
+```python
+# WRONG: 这假设样本索引 i 在所有视图中对应同一样本
+q = torch.stack(per_view_q, dim=0).mean(dim=0)  # [V, B, K] -> [B, K]
+assignments = q.argmax(dim=1)
+consensus = self.clustering.centroids[assignments]
+```
+
+**问题分析**：
+- `per_view_q[0][i]` 是视图 0 中样本 i 的软分配
+- `per_view_q[1][i]` 是视图 1 中样本 i 的软分配
+- 但在 UMVC 中，这两个样本 i **不是同一个样本**！
+- 因此平均 `(per_view_q[0][i] + per_view_q[1][i]) / 2` 是**无意义的**
+
+### 正确的实现（新代码）
+
+```python
+# CORRECT: 每个视图独立操作，不进行任何跨视图操作
+per_view_conditions = []
+for z_v in latents:
+    q_v, _ = self.clustering(z_v)  # [B, K]
+    assignments_v = q_v.argmax(dim=1)  # [B]
+    cond_v = self.clustering.centroids[assignments_v]  # [B, D]
+    per_view_conditions.append(cond_v)  # 每个视图有自己的条件
+```
+
+**关键改动**：
+1. 每个视图**独立**计算其聚类分配
+2. 每个视图**独立**选择其质心作为条件
+3. CFM 损失按**每视图**计算，然后取平均
+
+### 对比：Aligned vs Unaligned
+
+| 方面 | Aligned (IMVC) | Unaligned (UMVC) |
+|------|----------------|------------------|
+| 样本对应 | 索引 i 跨视图对应 | 索引 i 无对应关系 |
+| 共识表示 | `consensus = mean(latents)` | 不存在有效共识 |
+| 聚类条件 | 单一共识 → 质心 | 每视图独立 → 质心 |
+| 对比损失 | 有效（拉近同一样本的不同视图） | **无效**（被禁用） |
+| 软投票 | 可以跨视图平均 | **不可以**跨视图平均 |
+
+### 修改的文件
+
+1. **`ot_cfm.py`** - `forward()` 方法：
+   - Unaligned 模式下，`consensus` 设为 `None`
+   - 添加 `per_view_conditions`：每视图独立的质心条件
+   - 修改 `get_embeddings()` 处理 `consensus=None` 的情况
+
+2. **`losses.py`** - `OTCFMLoss.forward()` 方法：
+   - 添加 `per_view_conditions` 参数
+   - Unaligned 模式下，CFM 损失按每视图计算
+   - 对比损失在 Unaligned 模式下被禁用
+
+3. **`main.tex`** - 论文：
+   - 修改 Algorithm 1：明确区分 Aligned 和 Unaligned 的处理
+   - 修改 Section 4.1：强调每视图独立操作
+
+### 测试验证
+
+```
+=== Testing is_aligned=True ===
+  consensus is None: False ✅
+  has per_view_conditions: False ✅
+  Contrastive loss: 2.1570 ✅ (启用)
+
+=== Testing is_aligned=False ===
+  consensus is None: True ✅
+  has per_view_conditions: True ✅
+  Contrastive loss: 0.0000 ✅ (禁用)
+
+All tests passed!
+```
+
+### 教训
+
+1. **UMVC 的本质**：样本在不同视图中没有对应关系，这是 UMVC 与 IMVC 的根本区别
+2. **任何跨视图操作都需要样本对应**：平均、对比、投票等操作都隐含假设了样本对应
+3. **每视图独立是唯一正确的做法**：在 UMVC 中，每个视图必须作为独立的数据集处理

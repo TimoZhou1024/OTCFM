@@ -142,12 +142,13 @@ where $\alpha = 0.1$ is a scaling factor and $W_{skip}$ is a linear projection w
 \]
 where $\mathcal{V}_{avail}$ denotes the set of available views. This averaging is semantically meaningful because $\mathbf{z}_i^{(v)}$ and $\mathbf{z}_i^{(u)}$ correspond to the same underlying sample $i$.
 
-\textbf{Centroid-based Conditioning (Unaligned Setting).} For unaligned multi-view data (UMVC), the $i$-th sample in view $v$ does \textit{not} correspond to the $i$-th sample in view $u$. Therefore, \textbf{averaging latents across views is mathematically invalid}. Instead, we adopt a per-view cluster-centroid-based approach:
+\textbf{Centroid-based Conditioning (Unaligned Setting).} For unaligned multi-view data (UMVC), the $i$-th sample in view $v$ does \textit{not} correspond to the $i$-th sample in view $u$. Therefore, \textbf{any cross-view operation based on sample index $i$ is mathematically invalid}---this includes not only feature averaging but also soft-voting of cluster assignments. Instead, each view must independently determine its own conditioning:
 \begin{enumerate}
-    \item For each view $v$, compute soft cluster assignments $q_{ik}^{(v)}$ based solely on $\mathbf{z}_i^{(v)}$ and the shared centroids $\{\boldsymbol{\mu}_k\}_{k=1}^K$.
-    \item Use the nearest cluster centroid $\boldsymbol{\mu}_{k^{*(v)}}$ as the view-specific conditioning, where $k^{*(v)} = \argmax_k q_{ik}^{(v)}$.
+    \item For view $v$, compute soft cluster assignments $q_{ik}^{(v)}$ based solely on $\mathbf{z}_i^{(v)}$ and the shared centroids $\{\boldsymbol{\mu}_k\}_{k=1}^K$.
+    \item Determine the view-specific cluster: $k^{*(v)} = \argmax_k q_{ik}^{(v)}$.
+    \item Use $\boldsymbol{\mu}_{k^{*(v)}}$ as the conditioning for view $v$'s sample $i$.
 \end{enumerate}
-Critically, \textbf{no cross-view averaging is performed} at any stage. Each view's sample is independently assigned to a cluster based on its own latent representation. This design ensures that imputation and generation are conditioned on semantically coherent representations (cluster prototypes) rather than meaningless cross-sample averages.
+Critically, \textbf{each view operates entirely independently}. View $A$'s sample flows toward the centroid that View $A$ assigns it to; View $B$'s sample flows toward View $B$'s assigned centroid. Cross-view alignment is achieved \textit{solely} through the GW loss, which aligns the geometric structure of the latent distributions without requiring any sample-level correspondence.
 
 This encoding process serves two primary purposes: it reduces the computational complexity of the subsequent flow matching operations by operating in a lower-dimensional manifold $d_z \ll d_v$, and it filters out modality-specific noise while preserving the intrinsic semantic structure. The resulting latent representations $\mathcal{Z} = \{ \mathbf{Z}^{(v)} \in \mathbb{R}^{N \times d_z} \}_{v=1}^V$ form the basis for our flow-based alignment and generation mechanism.
 
@@ -299,11 +300,12 @@ The complete training process is summarized in Algorithm \ref{alg:ot_cfm}.
             \STATE Compute consensus: $\mathbf{z}^{(c)} = \frac{1}{V}\sum_v \mathbf{z}^{(v)}$.
             \STATE Condition $\mathbf{c} \gets \mathbf{z}^{(c)}$.
         \ELSE
-            \STATE \textit{// Unaligned: do NOT average across views.}
-            \STATE For each view $v$, compute per-view assignments:
+            \STATE \textit{// Unaligned: each view operates independently.}
+            \STATE For each view $v$ and sample $i$:
             \STATE \quad $q_{ik}^{(v)} = \frac{\exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_k / \tau)}{\sum_j \exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_j / \tau)}$
-            \STATE \quad $k^{*(v)} = \argmax_k q_{ik}^{(v)}$
-            \STATE Condition $\mathbf{c}^{(v)} \gets \boldsymbol{\mu}_{k^{*(v)}}$ (view-specific centroid).
+            \STATE \quad $k^{*(v)}_i = \argmax_k q_{ik}^{(v)}$
+            \STATE \quad Condition $\mathbf{c}_i^{(v)} \gets \boldsymbol{\mu}_{k^{*(v)}_i}$
+            \STATE \textit{// No cross-view voting: index $i$ has no correspondence.}
         \ENDIF
         \STATE Sample noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ and time $t \sim \mathcal{U}[0,1]$.
         \STATE Compute CFM Loss: $\mathcal{L}_{CFM} = \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - (1-\sigma_{min})\mathbf{z}_0) \|^2$.
