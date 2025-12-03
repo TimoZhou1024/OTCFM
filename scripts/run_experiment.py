@@ -23,6 +23,7 @@ from otcfm.config import (
 from otcfm.datasets import (
     load_caltech101, load_scene15, load_noisy_mnist,
     load_bdgp, load_cub, load_reuters, load_synthetic,
+    load_handwritten, load_coil20,
     create_dataloader, MultiViewDataset
 )
 from otcfm.ot_cfm import OTCFM
@@ -40,7 +41,9 @@ DATASET_LOADERS = {
     'bdgp': load_bdgp,
     'cub': load_cub,
     'reuters': load_reuters,
-    'synthetic': load_synthetic
+    'synthetic': load_synthetic,
+    'handwritten': load_handwritten,
+    'coil20': load_coil20,
 }
 
 
@@ -85,11 +88,17 @@ def load_dataset(config: DataConfig) -> tuple:
             n_samples=config.n_samples if hasattr(config, 'n_samples') else 1000,
             n_clusters=config.num_clusters if hasattr(config, 'num_clusters') else 10
         )
+        views = data['views']
+        labels = data['labels']
     else:
-        data = loader(config.data_root)
+        # Most loaders return (views, labels) tuple
+        result = loader(config.data_root)
+        if isinstance(result, tuple):
+            views, labels = result
+        else:
+            views = result['views']
+            labels = result['labels']
     
-    views = data['views']
-    labels = data['labels']
     view_dims = [v.shape[1] for v in views]
     
     print(f"Loaded {dataset_name} dataset:")

@@ -12,6 +12,26 @@ from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Tuple, Optional, Union
 import urllib.request
 import zipfile
+from PIL import Image
+import glob
+
+
+# Dataset download URLs
+DATASET_URLS = {
+    # Handwritten digits (UCI) - Multiple feature dataset
+    'handwritten': {
+        'url': 'https://archive.ics.uci.edu/static/public/72/multiple+features.zip',
+        'type': 'zip',
+        'description': 'UCI Multiple Features / Handwritten Digits (6 views, 2000 samples, 10 classes)',
+    },
+    
+    # COIL-20 (Columbia Object Image Library)
+    'coil20': {
+        'url': 'https://www.cs.columbia.edu/CAVE/databases/SLAM_coil-20_coil-100/coil-20/coil-20-proc.zip',
+        'type': 'zip',
+        'description': 'COIL-20 Object Images (multi-view capable, 1440 samples, 20 classes)',
+    },
+}
 
 
 class MultiViewDataset(Dataset):
@@ -226,6 +246,196 @@ def load_nus_wide(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
     return views, labels
 
 
+def download_and_extract(url: str, data_dir: str, dataset_name: str) -> str:
+    """Download and extract a zip file"""
+    os.makedirs(data_dir, exist_ok=True)
+    zip_path = os.path.join(data_dir, f"{dataset_name}.zip")
+    extract_dir = os.path.join(data_dir, dataset_name)
+    
+    if not os.path.exists(extract_dir):
+        print(f"Downloading {dataset_name} from {url}...")
+        try:
+            urllib.request.urlretrieve(url, zip_path)
+            print(f"Extracting to {extract_dir}...")
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            os.remove(zip_path)
+            print(f"Download complete!")
+        except Exception as e:
+            raise RuntimeError(f"Failed to download {dataset_name}: {e}")
+    
+    return extract_dir
+
+
+def load_handwritten(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
+    """
+    Load UCI Handwritten Digits (Multiple Features) dataset
+    6 views: fou, fac, kar, pix, zer, mor
+    2000 samples (200 per digit 0-9), 10 classes
+    """
+    dataset_dir = os.path.join(data_dir, "handwritten")
+    
+    # Check if already extracted or download
+    if not os.path.exists(dataset_dir):
+        extract_dir = download_and_extract(
+            DATASET_URLS['handwritten']['url'],
+            data_dir,
+            'handwritten'
+        )
+        dataset_dir = extract_dir
+    
+    # Feature file names and their dimensions
+    feature_files = {
+        'mfeat-fou': 76,   # Fourier coefficients
+        'mfeat-fac': 216,  # Profile correlations
+        'mfeat-kar': 64,   # Karhunen-Loève coefficients
+        'mfeat-pix': 240,  # Pixel averages
+        'mfeat-zer': 47,   # Zernike moments
+        'mfeat-mor': 6,    # Morphological features
+    }
+    
+    views = []
+    labels = None
+    
+    for fname, dim in feature_files.items():
+        # Try different possible paths
+        possible_paths = [
+            os.path.join(dataset_dir, fname),
+            os.path.join(dataset_dir, 'mfeat', fname),
+            os.path.join(dataset_dir, 'multiple+features', fname),
+        ]
+        
+        file_path = None
+        for p in possible_paths:
+            if os.path.exists(p):
+                file_path = p
+                break
+        
+        if file_path is None:
+            # Search recursively
+            found = glob.glob(os.path.join(dataset_dir, '**', fname), recursive=True)
+            if found:
+                file_path = found[0]
+        
+        if file_path is None:
+            raise FileNotFoundError(f"Could not find {fname} in {dataset_dir}")
+        
+        # Load the feature file
+        data = np.loadtxt(file_path, dtype=np.float32)
+        views.append(data)
+        
+        # Generate labels (200 samples per digit, 0-9)
+        if labels is None:
+            n_samples = data.shape[0]
+            samples_per_class = n_samples // 10
+            labels = np.repeat(np.arange(10), samples_per_class)
+    
+    return views, labels
+
+
+def load_coil20(data_dir: str, n_views: int = 3) -> Tuple[List[np.ndarray], np.ndarray]:
+    """
+    Load COIL-20 dataset as multi-view
+    Creates multiple views by grouping different rotation angles
+    
+    Args:
+        data_dir: Directory to store/load data
+        n_views: Number of views to create (default 3)
+                Each view contains 72/n_views images per object
+    
+    Returns:
+        views: List of view matrices, each [n_objects * samples_per_view, img_size]
+        labels: Object labels (0-19)
+    """
+    dataset_dir = os.path.join(data_dir, "coil20")
+    
+    # Check if already extracted or download
+    if not os.path.exists(dataset_dir):
+        extract_dir = download_and_extract(
+            DATASET_URLS['coil20']['url'],
+            data_dir,
+            'coil20'
+        )
+        dataset_dir = extract_dir
+    
+    # Find the actual image directory
+    img_dir = dataset_dir
+    possible_dirs = [
+        os.path.join(dataset_dir, 'coil-20-proc'),
+        os.path.join(dataset_dir, 'coil20'),
+        dataset_dir
+    ]
+    
+    for d in possible_dirs:
+        if os.path.exists(d) and glob.glob(os.path.join(d, '*.png')):
+            img_dir = d
+            break
+    
+    # COIL-20: 20 objects, 72 images per object (5 degree rotation steps)
+    # Filename format: obj{N}__{index}.png where N is 1-20, index is 0-71
+    n_objects = 20
+    n_images_per_object = 72
+    images_per_view = n_images_per_object // n_views
+    
+    # Load all images for all objects first
+    all_images = {}  # {obj_id: [img0, img1, ..., img71]}
+    
+    for obj_id in range(1, n_objects + 1):
+        all_images[obj_id] = []
+        for img_idx in range(n_images_per_object):
+            # Try different filename patterns
+            patterns = [
+                f"obj{obj_id}__{img_idx}.png",
+                f"obj{obj_id:02d}__{img_idx}.png",
+            ]
+            
+            img_path = None
+            for pattern in patterns:
+                p = os.path.join(img_dir, pattern)
+                if os.path.exists(p):
+                    img_path = p
+                    break
+            
+            if img_path is not None:
+                img = Image.open(img_path).convert('L')  # Grayscale
+                img_array = np.array(img, dtype=np.float32).flatten() / 255.0
+                all_images[obj_id].append(img_array)
+    
+    # Verify we have images
+    if not all_images[1]:
+        raise RuntimeError(f"No images found in {img_dir}. Please check the dataset.")
+    
+    # Create multi-view data
+    # Each view gets a subset of rotation angles
+    views = [[] for _ in range(n_views)]
+    labels = []
+    
+    for obj_id in range(1, n_objects + 1):
+        obj_images = all_images[obj_id]
+        if len(obj_images) < n_images_per_object:
+            print(f"Warning: Object {obj_id} has only {len(obj_images)} images")
+            continue
+        
+        # Split images into views
+        for view_idx in range(n_views):
+            start_idx = view_idx * images_per_view
+            end_idx = start_idx + images_per_view
+            view_images = obj_images[start_idx:end_idx]
+            views[view_idx].extend(view_images)
+        
+        # Add labels (one per sample per view)
+        labels.extend([obj_id - 1] * images_per_view)
+    
+    # Convert to numpy arrays
+    views = [np.array(v, dtype=np.float32) for v in views]
+    labels = np.array(labels)
+    
+    # Verify shapes
+    print(f"COIL-20 loaded: {len(views)} views, {views[0].shape[0]} samples, {views[0].shape[1]} features per view")
+    
+    return views, labels
+
+
 def create_synthetic_multiview(
     n_samples: int = 1000,
     n_clusters: int = 5,
@@ -263,6 +473,8 @@ DATASET_LOADERS = {
     'CUB': load_cub,
     'Reuters': load_reuters,
     'NUS-WIDE': load_nus_wide,
+    'Handwritten': load_handwritten,
+    'COIL20': load_coil20,
     'Synthetic': lambda x: create_synthetic_multiview(),
 }
 

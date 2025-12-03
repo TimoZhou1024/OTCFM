@@ -149,6 +149,7 @@ experiments/
 data/*.pkl
 data/*.pt
 data/*.npy
+data/*
 *.pth
 *.pt
 checkpoints/
