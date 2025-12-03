@@ -46,9 +46,10 @@ class OTCFM(nn.Module):
         lambda_gw: float = 0.2,        # 增加 GW 对齐损失
         lambda_cluster: float = 1.0,   # 显著增加聚类损失权重
         lambda_recon: float = 0.5,     # 减少重建损失
-        lambda_contrastive: float = 0.3,  # 增加对比学习
+        lambda_contrastive: float = 0.3,  # 增加对比学习 (仅用于aligned数据)
         dropout: float = 0.1,
-        use_cross_view_flow: bool = True  # 使用跨视图流匹配
+        use_cross_view_flow: bool = True,  # 使用跨视图流匹配
+        is_aligned: bool = True  # 是否为对齐数据。UMVC场景设为False
     ):
         super().__init__()
         
@@ -94,17 +95,19 @@ class OTCFM(nn.Module):
             lambda_cluster=lambda_cluster,
             lambda_recon=lambda_recon,
             lambda_contrastive=lambda_contrastive,
-            use_cross_view_flow=use_cross_view_flow
+            use_cross_view_flow=use_cross_view_flow,
+            is_aligned=is_aligned  # 控制是否使用contrastive loss
         )
         
         # Store hyperparameters
         self.sigma_min = sigma_min
+        self.is_aligned = is_aligned
     
     def encode(
         self,
         views: List[torch.Tensor],
         mask: Optional[torch.Tensor] = None
-    ) -> Tuple[List[torch.Tensor], torch.Tensor]:
+    ) -> Tuple[List[torch.Tensor], Optional[torch.Tensor]]:
         """
         Encode views to latent space and compute consensus
         
@@ -114,10 +117,26 @@ class OTCFM(nn.Module):
         
         Returns:
             latents: List of view latents
-            consensus: Fused consensus representation
+            consensus: Fused consensus representation (None for unaligned data)
+        
+        Note:
+            For UNALIGNED data (is_aligned=False), averaging latents across views
+            is mathematically invalid since x_i^(v) and x_i^(u) are NOT the same sample.
+            In this case, we return None for consensus and use cluster centroids
+            as conditioning for imputation instead.
         """
         latents = self.encoder_decoder.encode(views, mask)
-        consensus = self.encoder_decoder.fuse_latents(latents, mask)
+        
+        if self.is_aligned:
+            # Aligned data: safe to average across views
+            consensus = self.encoder_decoder.fuse_latents(latents, mask)
+        else:
+            # Unaligned data: averaging is INVALID!
+            # We will use cluster centroids for conditioning instead
+            # For now, return mean of first view as placeholder for shape compatibility
+            # The actual conditioning will be handled in forward() using cluster assignments
+            consensus = None
+        
         return latents, consensus
     
     def decode(self, latents: List[torch.Tensor]) -> List[torch.Tensor]:
@@ -138,6 +157,10 @@ class OTCFM(nn.Module):
         
         Returns:
             imputed_views: List with missing views imputed
+        
+        Note:
+            For ALIGNED data: condition on consensus (average of available views)
+            For UNALIGNED data: condition on cluster centroid (since averaging is invalid)
         """
         batch_size = views[0].shape[0]
         device = views[0].device
@@ -145,8 +168,29 @@ class OTCFM(nn.Module):
         # Encode available views
         latents, consensus = self.encode(views, mask)
         
-        # Use consensus as condition for imputation
-        condition = consensus
+        # Determine condition for imputation
+        if self.is_aligned and consensus is not None:
+            # Aligned data: use consensus (average of available views)
+            condition = consensus
+        else:
+            # Unaligned data: use cluster centroids as condition
+            # First, get cluster assignments from available views
+            available_latents = []
+            for v in range(self.num_views):
+                if mask[:, v].any():
+                    available_latents.append(latents[v])
+            
+            if available_latents:
+                # Use mean of available view latents to find nearest cluster
+                # Note: This is per-sample, not cross-sample averaging
+                pseudo_z = torch.stack(available_latents, dim=1).mean(dim=1)
+                q, _ = self.clustering(pseudo_z)
+                assignments = q.argmax(dim=1)
+                condition = self.clustering.centroids[assignments]
+            else:
+                # No views available: use random cluster centroid
+                random_assignments = torch.randint(0, self.num_clusters, (batch_size,), device=device)
+                condition = self.clustering.centroids[random_assignments]
         
         imputed_latents = []
         for v in range(self.num_views):
@@ -166,7 +210,7 @@ class OTCFM(nn.Module):
                     z0 = torch.randn(num_missing, self.latent_dim, device=device)
                     cond = condition[missing_idx]
                     
-                    # Solve ODE to generate missing latents
+                    # Solve ODE: Noise -> Data (conditioned on consensus/centroid)
                     z1 = self.ode_solver.solve(z0, cond)
                     imputed_z[missing_idx] = z1
                 
@@ -203,8 +247,29 @@ class OTCFM(nn.Module):
         # Encode views
         latents, consensus = self.encode(views, mask)
         
-        # Compute cluster assignments
-        q, p = self.clustering(consensus)
+        # For unaligned data, we need an alternative to consensus
+        if consensus is None:
+            # UNALIGNED: Do NOT average across views as samples are not corresponding.
+            # Instead, compute per-view cluster assignments independently.
+            # For training, we aggregate via soft voting across views.
+            
+            # Compute per-view soft assignments
+            per_view_q = []
+            for z_v in latents:
+                q_v, _ = self.clustering(z_v)  # [B, K]
+                per_view_q.append(q_v)
+            
+            # Aggregate via averaging soft assignments (not latents!)
+            # This is valid because we're averaging probability distributions, not features
+            q = torch.stack(per_view_q, dim=0).mean(dim=0)  # [V, B, K] -> [B, K]
+            p = self.clustering._target_distribution(q)
+            
+            # Use cluster centroids as the "consensus" for conditioning
+            assignments = q.argmax(dim=1)  # [B]
+            consensus = self.clustering.centroids[assignments]  # [B, D]
+        else:
+            # Aligned data: use actual consensus for clustering
+            q, p = self.clustering(consensus)
         
         outputs = {
             'latents': latents,

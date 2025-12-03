@@ -194,6 +194,10 @@ class ContrastiveLoss(nn.Module):
     """
     Contrastive loss for multi-view learning.
     Encourages same-sample representations to be similar across views.
+    
+    NOTE: This loss assumes sample correspondences are known (aligned setting).
+    For unaligned multi-view clustering (UMVC), this loss should be disabled
+    as x_i^(v) and x_i^(u) are NOT the same sample.
     """
     
     def __init__(self, temperature: float = 0.5):
@@ -209,6 +213,8 @@ class ContrastiveLoss(nn.Module):
         
         Returns:
             Contrastive loss
+        
+        WARNING: Only use this when samples are aligned across views!
         """
         num_views = len(latents)
         
@@ -289,8 +295,12 @@ class CrossViewFlowMatchingLoss(nn.Module):
     """
     Cross-view Flow Matching loss for better multi-view representation learning.
     
-    Instead of self-conditioning, we learn to transform from one view's latent
-    to another view's latent, encouraging the model to learn view-invariant features.
+    This serves as an auxiliary training signal that encourages view-invariant features
+    by learning to transform from each view's latent to the consensus.
+    
+    Note: This is DIFFERENT from the generative CFM loss used for imputation.
+    - CrossViewFM: View latent -> Consensus (auxiliary signal)
+    - Generative CFM: Noise -> Data (for imputation)
     """
     
     def __init__(self, sigma_min: float = 1e-4):
@@ -304,18 +314,18 @@ class CrossViewFlowMatchingLoss(nn.Module):
         consensus: torch.Tensor
     ) -> torch.Tensor:
         """
-        Compute cross-view flow matching loss
+        Compute cross-view flow matching loss (auxiliary signal)
         
         Args:
             vector_field: Neural network predicting v_theta
             latents: List of view-specific latents
-            consensus: Fused consensus representation
+            consensus: Fused consensus representation (or cluster centroid for unaligned)
         
         Returns:
             Cross-view FM loss
         """
-        if len(latents) < 2:
-            return torch.tensor(0.0, device=consensus.device)
+        if consensus is None or len(latents) < 1:
+            return torch.tensor(0.0, device=latents[0].device if latents else 'cpu')
         
         batch_size = consensus.shape[0]
         device = consensus.device
@@ -323,7 +333,7 @@ class CrossViewFlowMatchingLoss(nn.Module):
         total_loss = 0.0
         count = 0
         
-        # Learn to flow from each view to consensus
+        # Learn to flow from each view to consensus/centroid
         for z_view in latents:
             t = torch.rand(batch_size, device=device)
             t_expanded = t.unsqueeze(-1)
@@ -343,16 +353,78 @@ class CrossViewFlowMatchingLoss(nn.Module):
         return total_loss / count if count > 0 else total_loss
 
 
+class GenerativeFlowMatchingLoss(nn.Module):
+    """
+    Standard Generative Flow Matching loss: Noise -> Data
+    
+    This is the PRIMARY CFM loss used for training the vector field network
+    to generate view latents from noise, conditioned on semantic anchors
+    (consensus for aligned, cluster centroid for unaligned).
+    
+    L_CFM = E_{t,z0,z1} [ || v_theta(z_t, t, c) - (z1 - (1-sigma_min)*z0) ||^2 ]
+    """
+    
+    def __init__(self, sigma_min: float = 1e-4):
+        super().__init__()
+        self.sigma_min = sigma_min
+    
+    def forward(
+        self,
+        vector_field: nn.Module,
+        z1: torch.Tensor,  # Target data latent
+        condition: torch.Tensor  # Conditioning (consensus or centroid)
+    ) -> torch.Tensor:
+        """
+        Compute generative flow matching loss
+        
+        Args:
+            vector_field: Neural network predicting v_theta
+            z1: Target latent samples (data) [B, D]
+            condition: Conditioning information [B, D]
+        
+        Returns:
+            Generative CFM loss
+        """
+        if condition is None:
+            return torch.tensor(0.0, device=z1.device)
+        
+        batch_size = z1.shape[0]
+        device = z1.device
+        
+        # Sample time uniformly
+        t = torch.rand(batch_size, device=device)
+        
+        # Sample noise from prior p_0 = N(0, I)
+        z0 = torch.randn_like(z1)
+        
+        # Compute interpolation z_t = (1 - (1 - sigma_min)*t) * z0 + t * z1
+        t_expanded = t.unsqueeze(-1)
+        z_t = (1 - (1 - self.sigma_min) * t_expanded) * z0 + t_expanded * z1
+        
+        # Target vector field: u_t = z1 - (1 - sigma_min) * z0
+        target = z1 - (1 - self.sigma_min) * z0
+        
+        # Predict vector field conditioned on semantic anchor
+        pred = vector_field(z_t, t, condition)
+        
+        # MSE loss
+        loss = F.mse_loss(pred, target)
+        
+        return loss
+
+
 class OTCFMLoss(nn.Module):
     """
     Combined OT-CFM loss function (Optimized version)
     
     L_total = L_CFM + lambda_gw * L_GW + lambda_cluster * L_cluster + lambda_recon * L_recon
+            + lambda_contrastive * L_contrastive (only for aligned data)
     
     Key improvements:
     - Cross-view flow matching for better representation
     - Adaptive loss weighting
     - Stronger clustering signal
+    - Contrastive loss only for aligned settings (set lambda_contrastive=0 for UMVC)
     """
     
     def __init__(
@@ -364,7 +436,8 @@ class OTCFMLoss(nn.Module):
         lambda_cluster: float = 0.5,
         lambda_recon: float = 1.0,
         lambda_contrastive: float = 0.1,
-        use_cross_view_flow: bool = True
+        use_cross_view_flow: bool = True,
+        is_aligned: bool = True  # Set to False for UMVC (unaligned multi-view clustering)
     ):
         super().__init__()
         
@@ -378,41 +451,64 @@ class OTCFMLoss(nn.Module):
         self.lambda_gw = lambda_gw
         self.lambda_cluster = lambda_cluster
         self.lambda_recon = lambda_recon
-        self.lambda_contrastive = lambda_contrastive
+        # Contrastive loss weight: set to 0 for unaligned data
+        self.lambda_contrastive = lambda_contrastive if is_aligned else 0.0
         self.use_cross_view_flow = use_cross_view_flow
+        self.is_aligned = is_aligned
     
     def forward(
         self,
         vector_field: nn.Module,
         latents: List[torch.Tensor],
-        consensus: torch.Tensor,
+        consensus: Optional[torch.Tensor],  # Can be None for unaligned scenarios
         q: torch.Tensor,
         p: torch.Tensor,
         x_original: Optional[List[torch.Tensor]] = None,
         x_recon: Optional[List[torch.Tensor]] = None,
         mask: Optional[torch.Tensor] = None,
-        ablation_mode: str = "full"
+        ablation_mode: str = "full",
+        cluster_centers: Optional[torch.Tensor] = None  # For unaligned: use as CFM condition
     ) -> Tuple[torch.Tensor, dict]:
         """
         Compute total OT-CFM loss
+        
+        Args:
+            vector_field: Vector field network
+            latents: List of view-specific latent representations
+            consensus: Fused consensus representation (None for unaligned scenarios)
+            q: Soft cluster assignments
+            p: Target distribution
+            x_original: Original input data
+            x_recon: Reconstructed data
+            mask: Missing view mask
+            ablation_mode: Ablation study mode
+            cluster_centers: Cluster centers (used as condition when consensus is None)
         
         Returns:
             total_loss: Combined loss
             loss_dict: Dictionary of individual losses
         """
         loss_dict = {}
+        device = latents[0].device
         
-        # CFM loss - use cross-view flow matching for better learning
+        # CFM loss - always active, but conditioning source differs
+        # Aligned: condition on consensus (view average)
+        # Unaligned: condition on cluster centroids (consensus is actually centroids here)
         if ablation_mode != "no_flow":
-            if self.use_cross_view_flow:
-                # Cross-view flow matching (improved)
-                loss_cfm = self.cross_view_loss(vector_field, latents, consensus)
+            if consensus is not None:
+                if self.is_aligned and self.use_cross_view_flow:
+                    # Aligned: auxiliary cross-view flow (view → consensus)
+                    loss_cfm = self.cross_view_loss(vector_field, latents, consensus)
+                else:
+                    # Both aligned and unaligned use generative CFM
+                    # For aligned: condition = consensus; For unaligned: condition = centroid
+                    # The "consensus" passed in unaligned case is actually the cluster centroid
+                    loss_cfm = self.cfm_loss(vector_field, consensus, condition=consensus)
             else:
-                # Original self-conditioning
-                loss_cfm = self.cfm_loss(vector_field, consensus, condition=consensus)
+                loss_cfm = torch.tensor(0.0, device=device)
             loss_dict['cfm'] = loss_cfm.item()
         else:
-            loss_cfm = torch.tensor(0.0, device=consensus.device)
+            loss_cfm = torch.tensor(0.0, device=device)
             loss_dict['cfm'] = 0.0
         
         # GW alignment loss
@@ -420,7 +516,7 @@ class OTCFMLoss(nn.Module):
             loss_gw = self.gw_loss(latents)
             loss_dict['gw'] = loss_gw.item()
         else:
-            loss_gw = torch.tensor(0.0, device=consensus.device)
+            loss_gw = torch.tensor(0.0, device=device)
             loss_dict['gw'] = 0.0
         
         # Clustering loss - this is crucial for clustering performance
@@ -428,7 +524,7 @@ class OTCFMLoss(nn.Module):
             loss_cluster = self.cluster_loss(q, p)
             loss_dict['cluster'] = loss_cluster.item()
         else:
-            loss_cluster = torch.tensor(0.0, device=consensus.device)
+            loss_cluster = torch.tensor(0.0, device=device)
             loss_dict['cluster'] = 0.0
         
         # Reconstruction loss
@@ -436,12 +532,17 @@ class OTCFMLoss(nn.Module):
             loss_recon = self.recon_loss(x_original, x_recon, mask)
             loss_dict['recon'] = loss_recon.item()
         else:
-            loss_recon = torch.tensor(0.0, device=consensus.device)
+            loss_recon = torch.tensor(0.0, device=device)
             loss_dict['recon'] = 0.0
         
-        # Contrastive loss - helps learn view-invariant features
-        loss_contrastive = self.contrastive_loss(latents)
-        loss_dict['contrastive'] = loss_contrastive.item()
+        # Contrastive loss - ONLY for aligned data where sample correspondences are known
+        # For UMVC (unaligned), this loss is disabled (lambda_contrastive = 0)
+        if self.lambda_contrastive > 0 and self.is_aligned and consensus is not None:
+            loss_contrastive = self.contrastive_loss(latents)
+            loss_dict['contrastive'] = loss_contrastive.item()
+        else:
+            loss_contrastive = torch.tensor(0.0, device=device)
+            loss_dict['contrastive'] = 0.0
         
         # Total loss with better weighting
         total_loss = (

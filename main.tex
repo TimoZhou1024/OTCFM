@@ -75,7 +75,7 @@
 \printAffiliationsAndNotice{}
 
 \begin{abstract}
-Multi-view clustering (MVC) confronts dual challenges in real-world deployments: data incompleteness (missing views) and structural misalignment (unaligned samples). While Diffusion Models (DMs) have shown promise in generative imputation, their stochastic nature and iterative sampling impose high computational latency, and they inherently lack mechanisms to handle unaligned cross-view structures. We propose \textbf{Optimal Transport Coupled Flow Matching (OT-CFM)}, a unified framework that leverages the deterministic nature of continuous normalizing flows and the geometric properties of Optimal Transport. Unlike traditional methods that require explicit alignment steps or stochastic multistep generation, OT-CFM learns a cross-view flow that optimally transports view-specific latent representations toward a structurally aligned consensus centroid. This process enables deterministic, efficient view completion and alignment-free fusion simultaneously. Specifically, we introduce: (1) a cross-view flow matching objective that learns transformations from each view to the consensus space; (2) a Gromov-Wasserstein structural coupling loss computed on encoded representations to preserve intra-view geometry; (3) a cosine similarity-based soft clustering mechanism with contrastive regularization for enhanced cross-view consistency. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that OT-CFM achieves competitive performance with state-of-the-art methods while offering significantly faster inference.
+Multi-view clustering (MVC) confronts dual challenges in real-world deployments: data incompleteness (missing views) and structural misalignment (unaligned samples). While Diffusion Models (DMs) have shown promise in generative imputation, their stochastic nature and iterative sampling impose high computational latency, and they inherently lack mechanisms to handle unaligned cross-view structures. We propose \textbf{Optimal Transport Coupled Flow Matching (OT-CFM)}, a unified framework that leverages the deterministic nature of continuous normalizing flows and the geometric properties of Optimal Transport. Unlike traditional methods that require explicit alignment steps or stochastic multistep generation, OT-CFM learns a cross-view flow that optimally transports view-specific latent representations toward a structurally aligned consensus centroid. This process enables deterministic, efficient view completion and alignment-free fusion simultaneously. Specifically, we introduce: (1) a cross-view flow matching objective that learns transformations from each view to the consensus space; (2) a Gromov-Wasserstein structural coupling loss computed on encoded representations that aligns intra-view geometry \textit{without requiring sample correspondences}, making it suitable for unaligned scenarios; (3) a cosine similarity-based soft clustering mechanism; and (4) an optional contrastive regularization for aligned settings where sample correspondences are known. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that OT-CFM achieves competitive performance with state-of-the-art methods while offering significantly faster inference.
 \end{abstract}
 
 \section{Introduction}\label{introduction}
@@ -90,8 +90,8 @@ Motivated by these insights, we propose a novel framework, \textbf{Optimal Trans
 
 This paper makes the following contributions:
 (1) We identify the limitations of stochastic diffusion in unaligned scenarios and propose a Flow Matching-based framework for simultaneous IMVC and UMVC.
-(2) We develop a cross-view flow matching objective combined with Gromov-Wasserstein regularization that enforces structural alignment on encoded representations.
-(3) We introduce a comprehensive loss function combining flow matching, structural alignment, clustering, reconstruction, and contrastive objectives for robust multi-view learning.
+(2) We develop a cross-view flow matching objective combined with Gromov-Wasserstein regularization that enforces structural alignment on encoded representations \textit{without requiring sample correspondences}, enabling true alignment-free multi-view learning.
+(3) We introduce a modular loss function design where contrastive learning is applied only when sample correspondences are available, while GW-based structural alignment handles unaligned scenarios.
 (4) We demonstrate that OT-CFM achieves competitive performance with significant speedups compared to diffusion baselines.
 
 \section{Related Work}\label{related-work}
@@ -136,11 +136,18 @@ where $\alpha = 0.1$ is a scaling factor and $W_{skip}$ is a linear projection w
 
 \textbf{Decoder Architecture.} Symmetric to the encoders, we employ view-specific decoders $g_{\psi_v}: \mathbb{R}^{d_z} \to \mathbb{R}^{d_v}$ that reconstruct the original views from latent representations. This autoencoder structure provides a reconstruction objective that regularizes the latent space.
 
-\textbf{Consensus Fusion.} The multi-view consensus representation is obtained by averaging the view-specific latents:
+\textbf{Consensus Fusion (Aligned Setting).} For aligned multi-view data where sample correspondences are known, the multi-view consensus representation is obtained by averaging the view-specific latents:
 \[
 \mathbf{z}^{(c)} = \frac{1}{|\mathcal{V}_{avail}|} \sum_{v \in \mathcal{V}_{avail}} \mathbf{z}^{(v)}
 \]
-where $\mathcal{V}_{avail}$ denotes the set of available views. For incomplete data, only the available views contribute to the consensus, with the denominator adjusted accordingly.
+where $\mathcal{V}_{avail}$ denotes the set of available views. This averaging is semantically meaningful because $\mathbf{z}_i^{(v)}$ and $\mathbf{z}_i^{(u)}$ correspond to the same underlying sample $i$.
+
+\textbf{Centroid-based Conditioning (Unaligned Setting).} For unaligned multi-view data (UMVC), the $i$-th sample in view $v$ does \textit{not} correspond to the $i$-th sample in view $u$. Therefore, \textbf{averaging latents across views is mathematically invalid}. Instead, we adopt a per-view cluster-centroid-based approach:
+\begin{enumerate}
+    \item For each view $v$, compute soft cluster assignments $q_{ik}^{(v)}$ based solely on $\mathbf{z}_i^{(v)}$ and the shared centroids $\{\boldsymbol{\mu}_k\}_{k=1}^K$.
+    \item Use the nearest cluster centroid $\boldsymbol{\mu}_{k^{*(v)}}$ as the view-specific conditioning, where $k^{*(v)} = \argmax_k q_{ik}^{(v)}$.
+\end{enumerate}
+Critically, \textbf{no cross-view averaging is performed} at any stage. Each view's sample is independently assigned to a cluster based on its own latent representation. This design ensures that imputation and generation are conditioned on semantically coherent representations (cluster prototypes) rather than meaningless cross-sample averages.
 
 This encoding process serves two primary purposes: it reduces the computational complexity of the subsequent flow matching operations by operating in a lower-dimensional manifold $d_z \ll d_v$, and it filters out modality-specific noise while preserving the intrinsic semantic structure. The resulting latent representations $\mathcal{Z} = \{ \mathbf{Z}^{(v)} \in \mathbb{R}^{N \times d_z} \}_{v=1}^V$ form the basis for our flow-based alignment and generation mechanism.
 
@@ -162,15 +169,24 @@ This formulation encourages the pairwise geometric relationships to be consisten
 
 Note that in our implementation, the GW loss is computed on the encoded latent representations $\mathbf{z}^{(v)}$ directly, rather than on the intermediate states $\mathbf{z}_t$ during the flow process. This design choice simplifies the computation while still providing effective structural alignment through the gradient signal that propagates back to the encoder parameters.
 
+\textbf{Computational Complexity.} While GW distance computation scales quadratically with sample size, we compute it within mini-batches of size $B$, yielding $O(B^2)$ per batch. Since our goal is to align the \textit{manifold geometry} rather than global point-wise matching, batch-wise structural alignment provides a sufficient gradient signal for the encoders while maintaining linear complexity $O(N)$ with respect to the total dataset size.
+
 \subsection{Conditional Straight-Flow for Imputation}\label{conditional-flow}
 
-To address the Incomplete Multi-View Clustering (IMVC) problem, we formulate the missing view imputation as a conditional generation task within the flow matching framework. Let $\mathcal{V}_{avail}$ denote the set of indices for observed views and $\mathcal{V}_{miss}$ for missing views. We aim to learn a time-dependent vector field $v_\theta(\mathbf{z}_t, t, \mathbf{z}^{(c)})$ that generates the missing latent representations conditioned on the consensus representation computed from available views.
+To address the Incomplete Multi-View Clustering (IMVC) problem, we formulate the missing view imputation as a conditional generation task within the flow matching framework. Let $\mathcal{V}_{avail}$ denote the set of indices for observed views and $\mathcal{V}_{miss}$ for missing views. We aim to learn a time-dependent vector field $v_\theta(\mathbf{z}_t, t, \mathbf{c})$ that generates the missing latent representations conditioned on a conditioning vector $\mathbf{c}$.
+
+\textbf{Conditioning Strategy.} The choice of conditioning $\mathbf{c}$ depends on the data alignment:
+\begin{itemize}
+    \item \textbf{Aligned (IMVC):} $\mathbf{c} = \mathbf{z}^{(c)}$, the consensus computed from available views.
+    \item \textbf{Unaligned (UMVC):} $\mathbf{c} = \boldsymbol{\mu}_{k^*}$, the nearest cluster centroid based on available view latents.
+\end{itemize}
 
 \textbf{Imputation Procedure.} During inference, for samples with missing views, we:
 \begin{enumerate}
-    \item Encode all available views and compute the consensus $\mathbf{z}^{(c)}$ from the available view latents.
+    \item Encode all available views to obtain $\{\mathbf{z}^{(v)}\}_{v \in \mathcal{V}_{avail}}$.
+    \item Compute the conditioning vector $\mathbf{c}$ (consensus or cluster centroid).
     \item Sample initial noise $\mathbf{z}_0 \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ for each missing view.
-    \item Solve the ODE $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t, \mathbf{z}^{(c)})$ using the Euler method with $N_{steps} = 10$ integration steps.
+    \item Solve the ODE $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t, \mathbf{c})$ using the Euler method with $N_{steps} = 10$ integration steps.
     \item Decode the generated latent to obtain the imputed view.
 \end{enumerate}
 
@@ -191,11 +207,13 @@ The linearity of the OT-CFM path allows us to employ fixed-step ODE solvers with
 
 The training of the OT-CFM framework is governed by a unified objective function that integrates flow matching accuracy, structural alignment, clustering compactness, reconstruction fidelity, and cross-view consistency. 
 
-\textbf{Cross-View Flow Matching Loss.} Unlike standard CFM that learns to transport noise to data, we introduce a cross-view flow matching objective that learns to transform view-specific latents toward a unified consensus representation. For each view $v$, we define the flow from the view latent $\mathbf{z}^{(v)}$ to the consensus $\mathbf{z}^{(c)}$:
+\textbf{Generative Flow Matching Loss.} We adopt the standard Conditional Flow Matching (CFM) objective that learns to transport noise to data, conditioned on a semantic anchor. Let $\mathbf{z}_0 \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ be the noise sample, $\mathbf{z}_1$ be the target latent (data), and $\mathbf{c}$ be the conditioning vector (consensus for aligned, cluster centroid for unaligned). The CFM loss is:
 \[
-\mathcal{L}_{CFM}(\theta) = \frac{1}{V}\sum_{v=1}^{V} \mathbb{E}_{t \sim [0,1]} \left[ \| v_\theta(\psi_t(\mathbf{z}^{(v)}, \mathbf{z}^{(c)}), t, \mathbf{z}^{(v)}) - (\mathbf{z}^{(c)} - (1-\sigma_{min})\mathbf{z}^{(v)}) \|^2 \right]
+\mathcal{L}_{CFM}(\theta) = \mathbb{E}_{t \sim [0,1], \mathbf{z}_0, \mathbf{z}_1} \left[ \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - (1-\sigma_{min})\mathbf{z}_0) \|^2 \right]
 \]
-where $\psi_t(\mathbf{z}^{(v)}, \mathbf{z}^{(c)}) = (1 - (1 - \sigma_{min})t)\mathbf{z}^{(v)} + t\mathbf{z}^{(c)}$ is the interpolation path and $\mathbf{z}^{(v)}$ serves as the conditioning information. This formulation encourages the model to learn view-invariant features by explicitly modeling the transformation from each view to the shared consensus space.
+where $\mathbf{z}_t = (1 - (1 - \sigma_{min})t)\mathbf{z}_0 + t\mathbf{z}_1$ is the interpolation path. This formulation trains a \textit{generative} flow (Noise $\to$ Data) that can synthesize missing view latents at inference time.
+
+\textbf{Remark.} An alternative \textit{cross-view} formulation learns to flow from view latents to consensus: $\psi_t(\mathbf{z}^{(v)}, \mathbf{z}^{(c)})$. While this provides an auxiliary training signal for representation learning, the \textit{generative} formulation above is essential for imputation, as it enables sampling from noise.
 
 \textbf{Gromov-Wasserstein Structural Alignment.} To enforce geometric consistency across unaligned views, we incorporate the Gromov-Wasserstein regularization $\mathcal{L}_{GW}$ computed on the encoded latent representations using RBF kernel matrices.
 
@@ -214,17 +232,37 @@ where $\tau$ is the temperature parameter. The auxiliary target distribution $P$
 \]
 where $g_{\psi_v}$ is the decoder for view $v$.
 
-\textbf{Contrastive Loss.} To enhance cross-view consistency for aligned samples, we employ an InfoNCE-based contrastive loss that encourages representations of the same sample across different views to be similar:
+\textbf{Contrastive Loss (Aligned Setting Only).} For scenarios where sample correspondences are known (standard IMVC), we can additionally employ an InfoNCE-based contrastive loss to enhance cross-view consistency:
 \[
 \mathcal{L}_{Contrastive} = -\frac{1}{V(V-1)} \sum_{v \neq u} \sum_{i} \log \frac{\exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\mathbf{z}}_i^{(u)} / \tau_c)}{\sum_{j} \exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\mathbf{z}}_j^{(u)} / \tau_c)}
 \]
-where $\tau_c$ is the contrastive temperature.
+where $\tau_c$ is the contrastive temperature. \textbf{Importantly, this loss is only applicable when sample correspondences across views are available.} In the unaligned setting (UMVC), where the $i$-th sample in view $v$ does not correspond to the $i$-th sample in view $u$, this loss must be disabled ($\lambda_{con} = 0$). The GW loss $\mathcal{L}_{GW}$ serves as the sole mechanism for cross-view structural alignment in UMVC, as it operates on pairwise geometric relationships rather than point-wise correspondences.
 
 \textbf{Total Objective.} The complete objective is a weighted combination:
 \[
 \mathcal{L}_{Total} = \mathcal{L}_{CFM} + \lambda_{gw} \mathcal{L}_{GW} + \lambda_{c} \mathcal{L}_{Cluster} + \lambda_{r} \mathcal{L}_{Recon} + \lambda_{con} \mathcal{L}_{Contrastive}
 \]
-where we set $\lambda_{gw} = 0.2$, $\lambda_{c} = 1.0$, $\lambda_{r} = 0.5$, and $\lambda_{con} = 0.3$ as default hyperparameters.
+where we set $\lambda_{gw} = 0.2$, $\lambda_{c} = 1.0$, $\lambda_{r} = 0.5$ as default hyperparameters. The contrastive weight $\lambda_{con}$ is set to $0.3$ for aligned data and $0$ for unaligned data. Table~\ref{tab:loss_config} summarizes the loss configurations for different scenarios.
+
+\begin{table}[h]
+\centering
+\caption{Loss function configuration for different MVC scenarios.}
+\label{tab:loss_config}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Component} & \textbf{Aligned (IMVC)} & \textbf{Unaligned (UMVC)} \\
+\midrule
+\textbf{Flow Conditioning} & Consensus $\mathbf{z}^{(c)}$ & Centroid $\boldsymbol{\mu}_{k^*}$ \\
+$\mathcal{L}_{CFM}$ (Generative) & \checkmark & \checkmark \\
+$\mathcal{L}_{GW}$ & \checkmark & \checkmark \\
+$\mathcal{L}_{Cluster}$ & \checkmark & \checkmark \\
+$\mathcal{L}_{Recon}$ & \checkmark & \checkmark \\
+$\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
+\bottomrule
+\end{tabular}
+\vspace{0.3em}
+\footnotesize{The generative CFM loss is always active; only the conditioning source differs.}
+\end{table}
 
 \subsection{Optimization Procedure}\label{optimization}
 
@@ -232,9 +270,9 @@ Directly optimizing the joint objective $\mathcal{L}_{Total}$ is challenging due
 
 \textbf{Network Architecture.} Our encoder-decoder architecture employs view-specific MLP encoders with skip connections to map high-dimensional inputs to a shared latent space. Each encoder consists of fully-connected layers with batch normalization, ReLU activation, and dropout regularization. A scaled skip connection ($0.1\times$) from input to output helps preserve low-level features. The vector field network uses residual blocks with time conditioning via sinusoidal embeddings, following the design principles of diffusion models.
 
-\textbf{Training Procedure.} The optimization follows a two-phase approach:
+\textbf{Training Procedure.} The optimization follows a two-phase approach to address the cold-start problem, where good centroids require a stable latent space, but a good latent space benefits from meaningful conditioning:
 \begin{enumerate}
-    \item \textbf{Initialization Phase:} We first collect all latent embeddings by passing the dataset through the encoder, then initialize cluster centroids using K-Means on the normalized embeddings.
+    \item \textbf{Warm-up Phase:} We first train the encoder-decoder using only $\mathcal{L}_{Recon}$ for a few epochs to establish a stable latent space. Then, we collect all latent embeddings and initialize cluster centroids using K-Means on the normalized embeddings. This warm-up is crucial for unaligned scenarios where initial centroid quality directly affects flow training.
     \item \textbf{Joint Training Phase:} We perform end-to-end optimization of all network parameters using the combined loss $\mathcal{L}_{Total}$. The cluster centroids are treated as learnable parameters updated via gradient descent. Periodically (every few epochs), we refine the centroids using K-Means on the current embeddings to prevent degenerate solutions.
 \end{enumerate}
 
@@ -246,19 +284,26 @@ The complete training process is summarized in Algorithm \ref{alg:ot_cfm}.
   \caption{End-to-End Training for OT-CFM}
   \label{alg:ot_cfm}
   \begin{algorithmic}
-    \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_{gw}, \lambda_{c}, \lambda_{r}, \lambda_{con}$.
+    \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_{gw}, \lambda_{c}, \lambda_{r}, \lambda_{con}$, Alignment flag \texttt{is\_aligned}.
     \STATE {\bfseries Initialize:} Encoder-decoder parameters $\phi$, Vector field parameters $\theta$, Cluster centroids $\mathbf{M}$ via K-Means on initial embeddings.
     \FOR{epoch $= 1$ to $E$}
     \FOR{each mini-batch $\mathcal{B} \subset \mathcal{X}$}
         \STATE Encode views: $\mathbf{z}^{(v)} = f_{\phi_v}(\mathbf{x}^{(v)})$ for all views.
-        \STATE Fuse to consensus: $\mathbf{z}^{(c)} = \frac{1}{V}\sum_v \mathbf{z}^{(v)}$.
-        \STATE Compute soft assignments $q_{ik}$ via cosine similarity with temperature $\tau$.
-        \STATE Compute target distribution $p_{ik} \propto q_{ik}^2 / \sum_i q_{ik}$.
-        \STATE Sample time $t \sim \mathcal{U}[0,1]$.
-        \STATE Compute Cross-View Flow Loss $\mathcal{L}_{CFM}$: learn to flow from each $\mathbf{z}^{(v)}$ to $\mathbf{z}^{(c)}$.
+        \IF{\texttt{is\_aligned}}
+            \STATE Compute consensus: $\mathbf{z}^{(c)} = \frac{1}{V}\sum_v \mathbf{z}^{(v)}$.
+            \STATE Condition $\mathbf{c} \gets \mathbf{z}^{(c)}$.
+        \ELSE
+            \STATE \textit{// Unaligned: do NOT average across views.}
+            \STATE For each view $v$, compute per-view assignments:
+            \STATE \quad $q_{ik}^{(v)} = \frac{\exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_k / \tau)}{\sum_j \exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_j / \tau)}$
+            \STATE \quad $k^{*(v)} = \argmax_k q_{ik}^{(v)}$
+            \STATE Condition $\mathbf{c}^{(v)} \gets \boldsymbol{\mu}_{k^{*(v)}}$ (view-specific centroid).
+        \ENDIF
+        \STATE Sample noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ and time $t \sim \mathcal{U}[0,1]$.
+        \STATE Compute CFM Loss: $\mathcal{L}_{CFM} = \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - (1-\sigma_{min})\mathbf{z}_0) \|^2$.
         \STATE Compute GW Alignment Loss $\mathcal{L}_{GW}$ on encoded latents.
         \STATE Compute Clustering Loss $\mathcal{L}_{Cluster} = KL(P_{\mathcal{B}} \| Q_{\mathcal{B}})$.
-        \STATE Compute Reconstruction Loss $\mathcal{L}_{Recon}$ and Contrastive Loss $\mathcal{L}_{Contrastive}$.
+        \STATE Compute $\mathcal{L}_{Recon}$; compute $\mathcal{L}_{Contrastive}$ only if \texttt{is\_aligned}.
         \STATE Update all parameters via Adam with gradient clipping.
     \ENDFOR
     \IF{epoch mod $T_{update} = 0$}
