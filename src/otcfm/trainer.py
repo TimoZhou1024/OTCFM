@@ -118,9 +118,12 @@ class Trainer:
             Final metrics dictionary
         """
         # Phase 1: Pretrain encoder-decoder (重建任务)
-        if pretrain_epochs > 0:
-            print(f"Pretraining encoder-decoder for {pretrain_epochs} epochs...")
-            for epoch in range(pretrain_epochs):
+        recon_epochs = pretrain_epochs // 2 if pretrain_epochs > 10 else pretrain_epochs
+        dec_epochs = pretrain_epochs - recon_epochs
+        
+        if recon_epochs > 0:
+            print(f"Phase 1: Reconstruction pretraining for {recon_epochs} epochs...")
+            for epoch in range(recon_epochs):
                 self.model.train()
                 total_recon_loss = 0
                 num_batches = 0
@@ -142,21 +145,7 @@ class Trainer:
                         )
                     recon_loss = recon_loss / len(views)
                     
-                    # Add contrastive loss to learn good representations
-                    latents = outputs['latents']
-                    contrastive_loss = 0
-                    count = 0
-                    for i in range(len(latents)):
-                        for j in range(i + 1, len(latents)):
-                            z_i = F.normalize(latents[i], dim=-1)
-                            z_j = F.normalize(latents[j], dim=-1)
-                            pos_sim = (z_i * z_j).sum(dim=-1).mean()
-                            contrastive_loss -= pos_sim
-                            count += 1
-                    if count > 0:
-                        contrastive_loss = contrastive_loss / count
-                    
-                    loss = recon_loss + 0.5 * contrastive_loss
+                    loss = recon_loss
                     loss.backward()
                     
                     if self.config.clip_grad_norm > 0:
@@ -171,11 +160,76 @@ class Trainer:
                 
                 if (epoch + 1) % 5 == 0:
                     avg_loss = total_recon_loss / num_batches
-                    print(f"  Pretrain epoch {epoch+1}/{pretrain_epochs}, Recon Loss: {avg_loss:.4f}")
+                    print(f"  Recon epoch {epoch+1}/{recon_epochs}, Loss: {avg_loss:.4f}")
         
-        # Initialize clustering centroids after pretraining
+        # Initialize clustering centroids after reconstruction pretraining
         print("Initializing clustering centroids...")
         self.model.init_clustering(train_loader, self.device)
+        
+        # Phase 2: Single-View DEC pretraining (单视图聚类)
+        if dec_epochs > 0:
+            print(f"Phase 2: Single-View DEC pretraining for {dec_epochs} epochs...")
+            for epoch in range(dec_epochs):
+                self.model.train()
+                total_loss = 0
+                total_dec_loss = 0
+                total_recon_loss = 0
+                num_batches = 0
+                
+                for batch in train_loader:
+                    views = [v.to(self.device) for v in batch['views']]
+                    mask = batch['mask'].to(self.device)
+                    
+                    self.optimizer.zero_grad()
+                    
+                    outputs = self.model(views, mask, return_all=True)
+                    latents = outputs['latents']
+                    
+                    # Reconstruction loss
+                    recon_loss = 0
+                    for v_idx in range(len(views)):
+                        recon_loss += F.mse_loss(
+                            outputs['reconstructions'][v_idx], 
+                            views[v_idx]
+                        )
+                    recon_loss = recon_loss / len(views)
+                    
+                    # Single-View DEC loss: cluster each view independently
+                    # This builds cluster-separable latent space BEFORE cross-view alignment
+                    sv_dec_loss = 0
+                    for z_v in latents:
+                        # Compute soft assignments for this view
+                        q_v, p_v = self.model.clustering(z_v)
+                        # KL divergence loss (DEC objective)
+                        kl_loss = (p_v * torch.log((p_v + 1e-8) / (q_v + 1e-8))).sum(dim=1).mean()
+                        sv_dec_loss += kl_loss
+                    sv_dec_loss = sv_dec_loss / len(latents)
+                    
+                    # Combined loss: reconstruction + single-view DEC
+                    loss = recon_loss + 1.0 * sv_dec_loss
+                    loss.backward()
+                    
+                    if self.config.clip_grad_norm > 0:
+                        torch.nn.utils.clip_grad_norm_(
+                            self.model.parameters(),
+                            self.config.clip_grad_norm
+                        )
+                    
+                    self.optimizer.step()
+                    total_loss += loss.item()
+                    total_dec_loss += sv_dec_loss.item()
+                    total_recon_loss += recon_loss.item()
+                    num_batches += 1
+                
+                if (epoch + 1) % 5 == 0:
+                    avg_loss = total_loss / num_batches
+                    avg_dec = total_dec_loss / num_batches
+                    avg_recon = total_recon_loss / num_batches
+                    print(f"  SV-DEC epoch {epoch+1}/{dec_epochs}, Loss: {avg_loss:.4f} (DEC: {avg_dec:.4f}, Recon: {avg_recon:.4f})")
+            
+            # Re-initialize centroids after SV-DEC training for better starting point
+            print("Re-initializing centroids after SV-DEC pretraining...")
+            self.model.init_clustering(train_loader, self.device)
         
         # Training loop
         best_metrics = {}
