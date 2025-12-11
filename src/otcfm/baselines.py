@@ -600,7 +600,8 @@ class UnalignedMultiViewClustering(BaseClusteringMethod):
 def get_baseline_methods(
     view_dims: List[int],
     num_clusters: int,
-    device: str = 'cuda'
+    device: str = 'cuda',
+    include_external: bool = True
 ) -> Dict[str, BaseClusteringMethod]:
     """
     Get dictionary of all baseline methods
@@ -609,6 +610,7 @@ def get_baseline_methods(
         view_dims: Dimensions of each view
         num_clusters: Number of clusters
         device: Device for deep learning methods
+        include_external: Whether to include external methods from GitHub
     
     Returns:
         Dictionary of method name to method instance
@@ -628,6 +630,24 @@ def get_baseline_methods(
         'Incomplete-MVC': IncompleteMultiViewClustering(num_clusters),
         'Unaligned-MVC': UnalignedMultiViewClustering(num_clusters),
     }
+    
+    # Add external methods from GitHub repositories
+    if include_external:
+        try:
+            from .external_baselines import get_external_baselines, list_missing_external_methods
+            
+            external = get_external_baselines(view_dims, num_clusters, device)
+            if external:
+                baselines.update(external)
+                print(f"Loaded {len(external)} external methods")
+            else:
+                # Show hints for missing methods
+                missing = list_missing_external_methods()
+                if missing:
+                    print(f"No external methods found. To add SOTA baselines, run:")
+                    print(f"  python -m src.otcfm.external_baselines --missing")
+        except ImportError as e:
+            print(f"External baselines module not available: {e}")
     
     return baselines
 
