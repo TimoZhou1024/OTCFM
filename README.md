@@ -151,6 +151,9 @@ python scripts/run_experiment.py --mode train --dataset Synthetic --epochs 200
 # Compare with baselines
 python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200
 
+# Compare with baselines (including external methods: MFLVC, SURE, GCFAggMVC, etc.)
+python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200 --include_external
+
 # Run ablation study
 python scripts/run_experiment.py --mode ablation --dataset Caltech101 --epochs 100
 

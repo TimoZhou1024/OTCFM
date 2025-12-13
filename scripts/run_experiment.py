@@ -193,7 +193,8 @@ def run_experiment(config: ExperimentConfig) -> Dict:
 
 def run_comparison_experiment(
     config: ExperimentConfig,
-    run_baselines: bool = True
+    run_baselines: bool = True,
+    include_external: bool = True
 ) -> Dict:
     """
     Run comparison experiment with baselines
@@ -272,7 +273,7 @@ def run_comparison_experiment(
         mask_np = dataset.missing_mask.numpy() if hasattr(dataset, 'missing_mask') else None
         
         baseline_results = run_baseline_comparison(
-            views_np, labels, config.model.num_clusters, device, mask_np
+            views_np, labels, config.model.num_clusters, device, mask_np, include_external
         )
         
         for name, metrics in baseline_results.items():
@@ -421,6 +422,8 @@ def main():
                         help='Missing view rate')
     parser.add_argument('--unaligned_rate', type=float, default=0.0,
                         help='Unaligned sample rate')
+    parser.add_argument('--include_external', action='store_true', default=False,
+                        help='Include external baseline methods in comparison')
     
     args = parser.parse_args()
     
@@ -468,7 +471,7 @@ def main():
         print(f"Best ACC: {results['best']['acc']:.4f}")
         
     elif args.mode == 'compare':
-        results = run_comparison_experiment(config, run_baselines=True)
+        results = run_comparison_experiment(config, run_baselines=True, include_external=args.include_external)
         
     elif args.mode == 'ablation':
         results = run_ablation_experiment(config)

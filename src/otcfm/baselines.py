@@ -657,7 +657,8 @@ def run_baseline_comparison(
     labels: np.ndarray,
     num_clusters: int,
     device: str = 'cuda',
-    mask: Optional[np.ndarray] = None
+    mask: Optional[np.ndarray] = None,
+    include_external: bool = True
 ) -> Dict:
     """
     Run all baseline methods and compare results
@@ -668,6 +669,7 @@ def run_baseline_comparison(
         num_clusters: Number of clusters
         device: Device for deep methods
         mask: Optional missing view mask
+        include_external: Whether to include external methods
     
     Returns:
         Dictionary of method results
@@ -675,7 +677,7 @@ def run_baseline_comparison(
     from .metrics import evaluate_clustering
     
     view_dims = [v.shape[1] for v in views]
-    baselines = get_baseline_methods(view_dims, num_clusters, device)
+    baselines = get_baseline_methods(view_dims, num_clusters, device, include_external=include_external)
     
     results = {}
     
