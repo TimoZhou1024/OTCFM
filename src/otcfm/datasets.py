@@ -139,19 +139,62 @@ def load_caltech101(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
 
 
 def load_scene15(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
-    """Load Scene15 multi-view dataset"""
-    path = os.path.join(data_dir, "Scene-15.mat")
-    if not os.path.exists(path):
+    """Load Scene15 multi-view dataset
+    
+    Supports multiple file formats:
+    - Scene-15.mat with X1, X2, X3 and Y keys
+    - scene-15.mat with X (cell array) and gt keys
+    """
+    # Try multiple file names
+    possible_names = ["Scene-15.mat", "scene-15.mat", "Scene15.mat", "scene15.mat"]
+    path = None
+    for name in possible_names:
+        candidate = os.path.join(data_dir, name)
+        if os.path.exists(candidate):
+            path = candidate
+            break
+    
+    if path is None:
         raise FileNotFoundError(f"Please download Scene-15.mat to {data_dir}")
     
     data = sio.loadmat(path)
     views = []
-    for i in range(3):
-        view_key = f'X{i+1}' if f'X{i+1}' in data else f'x{i+1}'
-        if view_key in data:
-            views.append(np.array(data[view_key], dtype=np.float32))
     
-    labels = np.array(data['Y']).flatten() - 1
+    # Format 1: X1, X2, X3 keys (or x1, x2, x3)
+    if 'X1' in data or 'x1' in data:
+        for i in range(3):
+            view_key = f'X{i+1}' if f'X{i+1}' in data else f'x{i+1}'
+            if view_key in data:
+                views.append(np.array(data[view_key], dtype=np.float32))
+        labels = np.array(data['Y']).flatten() - 1
+    
+    # Format 2: X cell array with gt labels (common format)
+    elif 'X' in data:
+        X = data['X']
+        n_views = X.shape[1]
+        for i in range(n_views):
+            view_data = X[0, i]
+            # Transpose if features x samples
+            if view_data.shape[0] < view_data.shape[1]:
+                view_data = view_data.T
+            views.append(np.array(view_data, dtype=np.float32))
+        
+        # Labels: try 'gt', 'Y', 'labels'
+        if 'gt' in data:
+            labels = np.array(data['gt']).flatten()
+        elif 'Y' in data:
+            labels = np.array(data['Y']).flatten()
+        elif 'labels' in data:
+            labels = np.array(data['labels']).flatten()
+        else:
+            raise KeyError(f"Cannot find labels in {path}. Keys: {list(data.keys())}")
+        
+        # Adjust to 0-indexed if needed
+        if labels.min() == 1:
+            labels = labels - 1
+    else:
+        raise KeyError(f"Cannot find views in {path}. Keys: {list(data.keys())}")
+    
     return views, labels
 
 

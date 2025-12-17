@@ -488,9 +488,19 @@ class DealMVCWrapper(BaseClusteringMethod):
         CVPR 2023
     """
     
-    def __init__(self, num_clusters: int, epochs: int = 200, device: str = 'cuda'):
+    def __init__(self, num_clusters: int, mse_epochs: int = 200, 
+                 con_epochs: int = 50, feature_dim: int = 512,
+                 high_feature_dim: int = 128, batch_size: int = 256,
+                 lr: float = 0.0003, threshold: float = 0.5,
+                 device: str = 'cuda'):
         super().__init__(num_clusters)
-        self.epochs = epochs
+        self.mse_epochs = mse_epochs
+        self.con_epochs = con_epochs
+        self.feature_dim = feature_dim
+        self.high_feature_dim = high_feature_dim
+        self.batch_size = batch_size
+        self.lr = lr
+        self.threshold = threshold
         self.device = device
         self.embeddings_ = None
         
@@ -500,36 +510,202 @@ class DealMVCWrapper(BaseClusteringMethod):
         
         if not dealmvc_path.exists():
             print(f"DealMVC not found. Clone it with:")
-            print(f"  git clone https://github.com/SubmissionsIn/DealMVC.git {dealmvc_path}")
+            print(f"  git clone https://github.com/xihongyang1999/DealMVC.git {dealmvc_path}")
             self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
             return self.labels_
         
-        sys.path.insert(0, str(dealmvc_path))
+        # Override with kwargs
+        mse_epochs = kwargs.get('mse_epochs', self.mse_epochs)
+        con_epochs = kwargs.get('con_epochs', self.con_epochs)
+        batch_size = kwargs.get('batch_size', self.batch_size)
+        lr = kwargs.get('lr', self.lr)
+        threshold = kwargs.get('threshold', self.threshold)
+        device = kwargs.get('device', self.device)
+        
         try:
-            from DealMVC import DealMVC
+            from torch.nn.functional import normalize
+            from sklearn.preprocessing import MinMaxScaler
             
-            model = DealMVC(
-                n_clusters=self.num_clusters,
-                n_views=len(views),
-                dims=[v.shape[1] for v in views],
-                device=self.device
+            # Prepare data
+            view_dims = [v.shape[1] for v in views]
+            n_views = len(views)
+            n_samples = views[0].shape[0]
+            
+            # Define Network (same as DealMVC)
+            class Encoder(nn.Module):
+                def __init__(self, input_dim, feature_dim):
+                    super().__init__()
+                    self.encoder = nn.Sequential(
+                        nn.Linear(input_dim, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, 2000),
+                        nn.ReLU(),
+                        nn.Linear(2000, feature_dim),
+                    )
+                def forward(self, x):
+                    return self.encoder(x)
+            
+            class Decoder(nn.Module):
+                def __init__(self, input_dim, feature_dim):
+                    super().__init__()
+                    self.decoder = nn.Sequential(
+                        nn.Linear(feature_dim, 2000),
+                        nn.ReLU(),
+                        nn.Linear(2000, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, input_dim)
+                    )
+                def forward(self, x):
+                    return self.decoder(x)
+            
+            class DealMVCNet(nn.Module):
+                def __init__(self, view, input_size, feature_dim, high_dim, class_num, device):
+                    super().__init__()
+                    self.encoders = nn.ModuleList([
+                        Encoder(input_size[v], feature_dim).to(device) for v in range(view)
+                    ])
+                    self.decoders = nn.ModuleList([
+                        Decoder(input_size[v], feature_dim).to(device) for v in range(view)
+                    ])
+                    self.feature_module = nn.Sequential(nn.Linear(feature_dim, high_dim))
+                    self.label_module = nn.Sequential(
+                        nn.Linear(feature_dim, class_num),
+                        nn.Softmax(dim=1)
+                    )
+                    self.view = view
+                    
+                def forward(self, xs):
+                    hs, qs, xrs, zs = [], [], [], []
+                    for v in range(self.view):
+                        z = self.encoders[v](xs[v])
+                        h = normalize(self.feature_module(z), dim=1)
+                        q = self.label_module(z)
+                        xr = self.decoders[v](z)
+                        hs.append(h)
+                        zs.append(z)
+                        qs.append(q)
+                        xrs.append(xr)
+                    return hs, qs, xrs, zs
+            
+            # Create dataset
+            class CustomDataset(torch.utils.data.Dataset):
+                def __init__(self, views_data):
+                    self.views = [torch.FloatTensor(v) for v in views_data]
+                    self.n_samples = views_data[0].shape[0]
+                def __len__(self):
+                    return self.n_samples
+                def __getitem__(self, idx):
+                    return [v[idx] for v in self.views], 0, idx
+            
+            dataset = CustomDataset(views)
+            data_loader = torch.utils.data.DataLoader(
+                dataset, batch_size=min(batch_size, n_samples // 2),
+                shuffle=True, drop_last=True
             )
             
-            # DealMVC supports incomplete views via mask
-            self.labels_, self.embeddings_ = model.fit_predict(
-                views, mask=mask, epochs=self.epochs
-            )
+            # Initialize model
+            model = DealMVCNet(n_views, view_dims, self.feature_dim,
+                               self.high_feature_dim, self.num_clusters, device).to(device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            mse_loss = nn.MSELoss()
             
+            # Phase 1: Reconstruction pretraining
+            print(f"  DealMVC Phase 1: Reconstruction ({mse_epochs} epochs)...")
+            for epoch in range(mse_epochs):
+                model.train()
+                for xs, _, _ in data_loader:
+                    xs = [x.to(device) for x in xs]
+                    optimizer.zero_grad()
+                    _, _, xrs, _ = model(xs)
+                    loss = sum(mse_loss(xs[v], xrs[v]) for v in range(n_views))
+                    loss.backward()
+                    optimizer.step()
+                if (epoch + 1) % 50 == 0:
+                    print(f"    Epoch {epoch+1}/{mse_epochs}")
+            
+            # Phase 2: Contrastive training with local and global calibration
+            print(f"  DealMVC Phase 2: Contrastive calibration ({con_epochs} epochs)...")
+            for epoch in range(con_epochs):
+                model.train()
+                for xs, _, _ in data_loader:
+                    xs = [x.to(device) for x in xs]
+                    optimizer.zero_grad()
+                    hs, qs, xrs, zs = model(xs)
+                    
+                    loss_list = []
+                    
+                    # Local contrastive calibration between view pairs
+                    for v in range(n_views):
+                        for w in range(v + 1, n_views):
+                            # Similarity matrix
+                            sim = torch.exp(torch.mm(hs[v], hs[w].t()))
+                            sim_probs = sim / sim.sum(1, keepdim=True)
+                            
+                            # Pseudo label matrix
+                            Q = torch.mm(qs[v], qs[w].t())
+                            Q.fill_diagonal_(1)
+                            pos_mask = (Q >= threshold).float()
+                            Q = Q * pos_mask
+                            Q = Q / (Q.sum(1, keepdim=True) + 1e-7)
+                            
+                            # Local contrastive loss
+                            loss_local = -(torch.log(sim_probs + 1e-7) * Q).sum(1).mean()
+                            loss_list.append(loss_local)
+                        
+                        loss_list.append(mse_loss(xs[v], xrs[v]))
+                    
+                    # Global contrastive calibration
+                    fusion_h = sum(hs) / n_views  # Simple averaging
+                    sim_fusion = torch.exp(torch.mm(fusion_h, fusion_h.t()))
+                    sim_fusion_probs = sim_fusion / sim_fusion.sum(1, keepdim=True)
+                    
+                    # Fusion pseudo labels
+                    fusion_z = sum(zs) / n_views
+                    pse_fusion = model.label_module(fusion_z)
+                    Q_global = torch.mm(pse_fusion, pse_fusion.t())
+                    Q_global.fill_diagonal_(1)
+                    pos_mask_global = (Q_global >= threshold).float()
+                    Q_global = Q_global * pos_mask_global
+                    Q_global = Q_global / (Q_global.sum(1, keepdim=True) + 1e-7)
+                    
+                    loss_global = -(torch.log(sim_fusion_probs + 1e-7) * Q_global).sum(1).mean()
+                    loss_list.append(loss_global)
+                    
+                    loss = sum(loss_list)
+                    loss.backward()
+                    optimizer.step()
+                    
+                if (epoch + 1) % 10 == 0:
+                    print(f"    Epoch {epoch+1}/{con_epochs}")
+            
+            # Get final embeddings
+            model.eval()
+            full_loader = torch.utils.data.DataLoader(dataset, batch_size=n_samples, shuffle=False)
+            
+            with torch.no_grad():
+                for xs, _, _ in full_loader:
+                    xs = [x.to(device) for x in xs]
+                    hs, _, _, zs = model(xs)
+                    # Concatenate high-level features
+                    self.embeddings_ = torch.cat(hs, dim=1).cpu().numpy()
+            
+            # Clustering
+            self.labels_ = KMeans(n_clusters=self.num_clusters, n_init=10,
+                                  random_state=42).fit_predict(self.embeddings_)
+            
+            print(f"  DealMVC completed. Found {len(np.unique(self.labels_))} clusters.")
             return self.labels_
             
         except Exception as e:
+            import traceback
             print(f"DealMVC execution failed: {e}")
+            traceback.print_exc()
             self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
             return self.labels_
-            
-        finally:
-            if str(dealmvc_path) in sys.path:
-                sys.path.remove(str(dealmvc_path))
     
     def get_embeddings(self) -> Optional[np.ndarray]:
         return self.embeddings_
@@ -837,6 +1013,262 @@ class GCFAggMVCWrapper(BaseClusteringMethod):
 
 
 # ============================================================
+# DCG: Diffusion-based Cross-view Generation for Incomplete MVC
+# Paper: AAAI 2025
+# GitHub: https://github.com/zhangyuanyang21/2025-AAAI-DCG
+# ============================================================
+
+class DCGWrapper(BaseClusteringMethod):
+    """
+    DCG: Diffusion-based Cross-view Generation for Incomplete Multi-View Clustering
+    
+    Uses diffusion models to generate missing views and performs clustering
+    with attention-based fusion and contrastive learning.
+    
+    Reference:
+        Zhang et al., "Diffusion-based Cross-view Generation for 
+        Incomplete Multi-View Clustering", AAAI 2025
+    """
+    
+    def __init__(self, num_clusters: int, epochs: int = 200, 
+                 latent_dim: int = 128, batch_size: int = 256,
+                 lr: float = 0.0003, num_timesteps: int = 1000,
+                 device: str = 'cuda'):
+        super().__init__(num_clusters)
+        self.epochs = epochs
+        self.latent_dim = latent_dim
+        self.batch_size = batch_size
+        self.lr = lr
+        self.num_timesteps = num_timesteps
+        self.device = device
+        self.embeddings_ = None
+        
+    def fit_predict(self, views: List[np.ndarray], 
+                    mask: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+        dcg_path = EXTERNAL_PATH / "2025-AAAI-DCG"
+        
+        if not dcg_path.exists():
+            print(f"DCG not found. Clone it with:")
+            print(f"  git clone https://github.com/zhangyuanyang21/2025-AAAI-DCG.git {dcg_path}")
+            self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+            return self.labels_
+        
+        # Override with kwargs
+        epochs = kwargs.get('epochs', self.epochs)
+        batch_size = kwargs.get('batch_size', self.batch_size)
+        lr = kwargs.get('lr', self.lr)
+        device = kwargs.get('device', self.device)
+        
+        try:
+            # Prepare data
+            view_dims = [v.shape[1] for v in views]
+            n_views = len(views)
+            n_samples = views[0].shape[0]
+            
+            if n_views != 2:
+                print(f"  DCG only supports 2 views, got {n_views}. Using fallback.")
+                self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+                return self.labels_
+            
+            # Define components similar to DCG
+            class Autoencoder(nn.Module):
+                def __init__(self, input_dim, latent_dim):
+                    super().__init__()
+                    self.encoder = nn.Sequential(
+                        nn.Linear(input_dim, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, latent_dim)
+                    )
+                    self.decoder = nn.Sequential(
+                        nn.Linear(latent_dim, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, input_dim)
+                    )
+                def forward(self, x):
+                    z = self.encoder(x)
+                    xr = self.decoder(z)
+                    return z, xr
+            
+            class DiffusionUNet(nn.Module):
+                """Simple diffusion network for noise prediction"""
+                def __init__(self, latent_dim, emb_size=128):
+                    super().__init__()
+                    self.time_emb = nn.Sequential(
+                        nn.Linear(1, emb_size),
+                        nn.SiLU(),
+                        nn.Linear(emb_size, emb_size)
+                    )
+                    self.net = nn.Sequential(
+                        nn.Linear(latent_dim + emb_size, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, 500),
+                        nn.ReLU(),
+                        nn.Linear(500, latent_dim)
+                    )
+                    
+                def forward(self, x, t):
+                    t_emb = self.time_emb(t.float().unsqueeze(-1))
+                    h = torch.cat([x, t_emb], dim=-1)
+                    return self.net(h)
+            
+            class AttentionFusion(nn.Module):
+                """Attention-based view fusion"""
+                def __init__(self, latent_dim):
+                    super().__init__()
+                    self.query = nn.Linear(latent_dim, latent_dim)
+                    self.key = nn.Linear(latent_dim, latent_dim)
+                    self.value = nn.Linear(latent_dim, latent_dim)
+                    
+                def forward(self, z1, z2):
+                    # Simple attention fusion
+                    z_stack = torch.stack([z1, z2], dim=1)  # [N, 2, D]
+                    q = self.query(z_stack.mean(dim=1, keepdim=True))  # [N, 1, D]
+                    k = self.key(z_stack)  # [N, 2, D]
+                    v = self.value(z_stack)  # [N, 2, D]
+                    
+                    attn = torch.softmax(torch.bmm(q, k.transpose(1, 2)) / (z1.size(-1) ** 0.5), dim=-1)
+                    out = torch.bmm(attn, v).squeeze(1)  # [N, D]
+                    return out
+            
+            class ClusterLayer(nn.Module):
+                """Soft clustering assignment"""
+                def __init__(self, latent_dim, n_clusters):
+                    super().__init__()
+                    self.fc = nn.Linear(latent_dim, n_clusters)
+                    
+                def forward(self, z):
+                    logits = self.fc(z)
+                    q = F.softmax(logits, dim=1)
+                    return q, logits
+            
+            # Initialize models
+            ae1 = Autoencoder(view_dims[0], self.latent_dim).to(device)
+            ae2 = Autoencoder(view_dims[1], self.latent_dim).to(device)
+            df1 = DiffusionUNet(self.latent_dim).to(device)
+            df2 = DiffusionUNet(self.latent_dim).to(device)
+            attention = AttentionFusion(self.latent_dim).to(device)
+            cluster_layer = ClusterLayer(self.latent_dim, self.num_clusters).to(device)
+            
+            optimizer = torch.optim.Adam(
+                list(ae1.parameters()) + list(ae2.parameters()) + 
+                list(df1.parameters()) + list(df2.parameters()) +
+                list(attention.parameters()) + list(cluster_layer.parameters()),
+                lr=lr
+            )
+            
+            # Create dataset
+            class CustomDataset(torch.utils.data.Dataset):
+                def __init__(self, v1, v2):
+                    self.v1 = torch.FloatTensor(v1)
+                    self.v2 = torch.FloatTensor(v2)
+                def __len__(self):
+                    return len(self.v1)
+                def __getitem__(self, idx):
+                    return self.v1[idx], self.v2[idx], idx
+            
+            dataset = CustomDataset(views[0], views[1])
+            data_loader = torch.utils.data.DataLoader(
+                dataset, batch_size=min(batch_size, n_samples // 2),
+                shuffle=True, drop_last=True
+            )
+            
+            # Noise scheduler (simplified)
+            betas = torch.linspace(0.0001, 0.02, self.num_timesteps)
+            alphas = 1.0 - betas
+            alphas_cumprod = torch.cumprod(alphas, dim=0).to(device)
+            
+            def add_noise(x, noise, t):
+                sqrt_alpha = alphas_cumprod[t].sqrt().view(-1, 1)
+                sqrt_one_minus_alpha = (1 - alphas_cumprod[t]).sqrt().view(-1, 1)
+                return sqrt_alpha * x + sqrt_one_minus_alpha * noise
+            
+            # Training
+            print(f"  DCG Training ({epochs} epochs)...")
+            mse_loss = nn.MSELoss()
+            
+            for epoch in range(epochs):
+                ae1.train(); ae2.train()
+                df1.train(); df2.train()
+                attention.train(); cluster_layer.train()
+                
+                total_loss = 0
+                for x1, x2, _ in data_loader:
+                    x1, x2 = x1.to(device), x2.to(device)
+                    optimizer.zero_grad()
+                    
+                    # Encode
+                    z1, xr1 = ae1(x1)
+                    z2, xr2 = ae2(x2)
+                    
+                    # Reconstruction loss
+                    loss_rec = mse_loss(xr1, x1) + mse_loss(xr2, x2)
+                    
+                    # Diffusion loss
+                    t = torch.randint(0, self.num_timesteps, (z1.size(0),), device=device)
+                    noise1 = torch.randn_like(z1)
+                    noise2 = torch.randn_like(z2)
+                    noisy_z1 = add_noise(z1, noise1, t)
+                    noisy_z2 = add_noise(z2, noise2, t)
+                    pred_noise1 = df1(noisy_z1, t)
+                    pred_noise2 = df2(noisy_z2, t)
+                    loss_diff = mse_loss(pred_noise1, noise1) + mse_loss(pred_noise2, noise2)
+                    
+                    # Attention fusion
+                    h = attention(z1, z2)
+                    
+                    # Clustering loss
+                    q1, _ = cluster_layer(z1)
+                    q2, _ = cluster_layer(z2)
+                    qh, _ = cluster_layer(h)
+                    
+                    # Cross-entropy between views
+                    loss_cluster = -torch.mean(torch.sum(q1 * torch.log(q2 + 1e-7), dim=1))
+                    loss_cluster += -torch.mean(torch.sum(qh * torch.log(q1 + 1e-7), dim=1))
+                    
+                    loss = loss_rec + 0.5 * loss_diff + 0.5 * loss_cluster
+                    loss.backward()
+                    optimizer.step()
+                    
+                    total_loss += loss.item()
+                
+                if (epoch + 1) % 50 == 0:
+                    print(f"    Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(data_loader):.4f}")
+            
+            # Get final embeddings
+            ae1.eval(); ae2.eval(); attention.eval()
+            full_loader = torch.utils.data.DataLoader(dataset, batch_size=n_samples, shuffle=False)
+            
+            with torch.no_grad():
+                for x1, x2, _ in full_loader:
+                    x1, x2 = x1.to(device), x2.to(device)
+                    z1, _ = ae1(x1)
+                    z2, _ = ae2(x2)
+                    h = attention(z1, z2)
+                    self.embeddings_ = h.cpu().numpy()
+            
+            # Clustering
+            self.labels_ = KMeans(n_clusters=self.num_clusters, n_init=10,
+                                  random_state=42).fit_predict(self.embeddings_)
+            
+            print(f"  DCG completed. Found {len(np.unique(self.labels_))} clusters.")
+            return self.labels_
+            
+        except Exception as e:
+            import traceback
+            print(f"DCG execution failed: {e}")
+            traceback.print_exc()
+            self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+            return self.labels_
+    
+    def get_embeddings(self) -> Optional[np.ndarray]:
+        return self.embeddings_
+
+
+# ============================================================
 # Registry: Get all available external methods
 # ============================================================
 
@@ -867,6 +1299,7 @@ def get_external_baselines(
         ("DealMVC", "DealMVC (CVPR23)", DealMVCWrapper),
         ("COMPLETER", "COMPLETER (CVPR21)", COMPLETERWrapper),
         ("GCFAggMVC", "GCFAggMVC (CVPR23)", GCFAggMVCWrapper),
+        ("2025-AAAI-DCG", "DCG (AAAI25)", DCGWrapper),
     ]
     
     for folder_name, display_name, wrapper_class in method_configs:
@@ -885,7 +1318,7 @@ def list_available_external_methods() -> List[str]:
     """List all external methods that are available (code exists)"""
     available = []
     
-    method_folders = ["MFLVC", "SURE", "DealMVC", "COMPLETER", "GCFAggMVC"]
+    method_folders = ["MFLVC", "SURE", "DealMVC", "COMPLETER", "GCFAggMVC", "2025-AAAI-DCG"]
     
     for folder in method_folders:
         if (EXTERNAL_PATH / folder).exists():
@@ -904,6 +1337,7 @@ def list_missing_external_methods() -> Dict[str, str]:
         "DealMVC": "https://github.com/SubmissionsIn/DealMVC.git",
         "COMPLETER": "https://github.com/XLearning-SCU/2021-CVPR-Completer.git",
         "GCFAggMVC": "https://github.com/Galaxy922/GCFAggMVC.git",
+        "2025-AAAI-DCG": "https://github.com/zhangyuanyang21/2025-AAAI-DCG.git",
     }
     
     for name, repo in method_repos.items():

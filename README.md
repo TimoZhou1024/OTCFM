@@ -154,6 +154,9 @@ python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200
 # Compare with baselines (including external methods: MFLVC, SURE, GCFAggMVC, etc.)
 python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200 --include_external
 
+# Compare with external methods only (exclude internal baselines)
+python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200 --include_external --no_internal
+
 # Run ablation study
 python scripts/run_experiment.py --mode ablation --dataset Caltech101 --epochs 100
 

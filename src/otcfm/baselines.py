@@ -601,35 +601,41 @@ def get_baseline_methods(
     view_dims: List[int],
     num_clusters: int,
     device: str = 'cuda',
-    include_external: bool = True
+    include_external: bool = True,
+    include_internal: bool = True
 ) -> Dict[str, BaseClusteringMethod]:
     """
     Get dictionary of all baseline methods
-    
+
     Args:
         view_dims: Dimensions of each view
         num_clusters: Number of clusters
         device: Device for deep learning methods
         include_external: Whether to include external methods from GitHub
-    
+        include_internal: Whether to include internal baseline methods
+
     Returns:
         Dictionary of method name to method instance
     """
-    baselines = {
-        # Traditional methods
-        'Concat-KMeans': ConcatKMeans(num_clusters),
-        'Multi-View Spectral': MultiViewSpectral(num_clusters),
-        'CCA-Clustering': CanonicalCorrelationAnalysis(num_clusters),
-        'Weighted-View': WeightedViewClustering(num_clusters),
-        
-        # Deep learning methods
-        'DMVC': DeepMultiViewClustering(view_dims, num_clusters=num_clusters),
-        'Contrastive-MVC': ContrastiveMultiViewClustering(view_dims, num_clusters=num_clusters),
-        
-        # Incomplete/Unaligned methods
-        'Incomplete-MVC': IncompleteMultiViewClustering(num_clusters),
-        'Unaligned-MVC': UnalignedMultiViewClustering(num_clusters),
-    }
+    baselines = {}
+
+    # Add internal baseline methods
+    if include_internal:
+        baselines.update({
+            # Traditional methods
+            'Concat-KMeans': ConcatKMeans(num_clusters),
+            'Multi-View Spectral': MultiViewSpectral(num_clusters),
+            'CCA-Clustering': CanonicalCorrelationAnalysis(num_clusters),
+            'Weighted-View': WeightedViewClustering(num_clusters),
+
+            # Deep learning methods
+            'DMVC': DeepMultiViewClustering(view_dims, num_clusters=num_clusters),
+            'Contrastive-MVC': ContrastiveMultiViewClustering(view_dims, num_clusters=num_clusters),
+
+            # Incomplete/Unaligned methods
+            'Incomplete-MVC': IncompleteMultiViewClustering(num_clusters),
+            'Unaligned-MVC': UnalignedMultiViewClustering(num_clusters),
+        })
     
     # Add external methods from GitHub repositories
     if include_external:
@@ -658,11 +664,12 @@ def run_baseline_comparison(
     num_clusters: int,
     device: str = 'cuda',
     mask: Optional[np.ndarray] = None,
-    include_external: bool = True
+    include_external: bool = True,
+    include_internal: bool = True
 ) -> Dict:
     """
     Run all baseline methods and compare results
-    
+
     Args:
         views: List of view arrays
         labels: Ground truth labels
@@ -670,14 +677,17 @@ def run_baseline_comparison(
         device: Device for deep methods
         mask: Optional missing view mask
         include_external: Whether to include external methods
-    
+        include_internal: Whether to include internal methods
+
     Returns:
         Dictionary of method results
     """
     from .metrics import evaluate_clustering
-    
+
     view_dims = [v.shape[1] for v in views]
-    baselines = get_baseline_methods(view_dims, num_clusters, device, include_external=include_external)
+    baselines = get_baseline_methods(view_dims, num_clusters, device,
+                                     include_external=include_external,
+                                     include_internal=include_internal)
     
     results = {}
     
