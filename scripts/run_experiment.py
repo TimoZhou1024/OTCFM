@@ -10,6 +10,8 @@ import time
 import argparse
 import numpy as np
 import torch
+import pandas as pd
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -195,7 +197,8 @@ def run_comparison_experiment(
     config: ExperimentConfig,
     run_baselines: bool = True,
     include_external: bool = True,
-    include_internal: bool = True
+    include_internal: bool = True,
+    save_dir: str = "results"
 ) -> Dict:
     """
     Run comparison experiment with baselines
@@ -298,15 +301,68 @@ def run_comparison_experiment(
     with open(comparison_path, 'w') as f:
         json.dump(all_results, f, indent=2)
     
+    # Save results to CSV in a dedicated results folder
+    save_results_to_csv(
+        all_results, 
+        dataset_name=config.data.dataset_name,
+        save_dir=save_dir
+    )
+    
     return all_results
 
 
-def run_ablation_experiment(config: ExperimentConfig) -> Dict:
+def save_results_to_csv(
+    results: Dict,
+    dataset_name: str,
+    save_dir: str = "results"
+) -> str:
+    """
+    Save experiment results to a CSV file
+    
+    Args:
+        results: Dictionary with method names as keys and metrics as values
+        dataset_name: Name of the dataset used
+        save_dir: Directory to save results
+    
+    Returns:
+        Path to the saved CSV file
+    """
+    # Prepare data for DataFrame
+    rows = []
+    for method, metrics in results.items():
+        if isinstance(metrics, dict) and 'error' not in metrics:
+            row = {
+                'Method': method,
+                'ACC': metrics.get('acc', metrics.get('ACC', np.nan)),
+                'NMI': metrics.get('nmi', metrics.get('NMI', np.nan)),
+                'ARI': metrics.get('ari', metrics.get('ARI', np.nan)),
+                'Purity': metrics.get('purity', metrics.get('Purity', np.nan)),
+                'F1': metrics.get('f1', metrics.get('F1', np.nan)),
+            }
+            rows.append(row)
+    
+    # Create DataFrame and sort by ACC
+    results_df = pd.DataFrame(rows)
+    if not results_df.empty:
+        results_df = results_df.sort_values('ACC', ascending=False)
+    
+    # Save to CSV
+    os.makedirs(save_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_path = os.path.join(save_dir, f'{dataset_name}_{timestamp}.csv')
+    results_df.to_csv(results_path, index=False)
+    
+    print(f"\nResults saved to: {results_path}")
+    return results_path
+
+
+def run_ablation_experiment(config: ExperimentConfig, save_dir: str = "results") -> Dict:
     """
     Run ablation study
     
     Args:
         config: Experiment configuration
+        save_dir: Directory to save CSV results
     
     Returns:
         Dictionary with ablation results
@@ -342,12 +398,62 @@ def run_ablation_experiment(config: ExperimentConfig) -> Dict:
     study = AblationStudy(config, ablation_config, device)
     results = study.run(train_loader, labels, view_dims)
     
+    # Save ablation results to CSV
+    save_ablation_results_to_csv(
+        results,
+        dataset_name=config.data.dataset_name,
+        save_dir=save_dir
+    )
+    
     return results
+
+
+def save_ablation_results_to_csv(
+    results: Dict,
+    dataset_name: str,
+    save_dir: str = "results"
+) -> str:
+    """
+    Save ablation study results to a CSV file
+    
+    Args:
+        results: Dictionary with ablation mode results
+        dataset_name: Name of the dataset used
+        save_dir: Directory to save results
+    
+    Returns:
+        Path to the saved CSV file
+    """
+    rows = []
+    for mode, metrics in results.items():
+        if isinstance(metrics, dict):
+            row = {
+                'Mode': mode,
+                'ACC': metrics.get('acc', metrics.get('ACC', np.nan)),
+                'NMI': metrics.get('nmi', metrics.get('NMI', np.nan)),
+                'ARI': metrics.get('ari', metrics.get('ARI', np.nan)),
+                'ACC_std': metrics.get('acc_std', np.nan),
+                'NMI_std': metrics.get('nmi_std', np.nan),
+            }
+            rows.append(row)
+    
+    results_df = pd.DataFrame(rows)
+    
+    os.makedirs(save_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_path = os.path.join(save_dir, f'{dataset_name}_ablation_{timestamp}.csv')
+    results_df.to_csv(results_path, index=False)
+    
+    print(f"\nAblation results saved to: {results_path}")
+    return results_path
 
 
 def run_multi_dataset_experiment(
     datasets: List[str],
-    base_config: ExperimentConfig
+    base_config: ExperimentConfig,
+    include_external: bool = False,
+    include_internal: bool = True,
+    save_dir: str = "results"
 ) -> Dict:
     """
     Run experiments on multiple datasets
@@ -355,6 +461,9 @@ def run_multi_dataset_experiment(
     Args:
         datasets: List of dataset names
         base_config: Base configuration
+        include_external: Whether to include external baseline methods
+        include_internal: Whether to include internal baseline methods
+        save_dir: Directory to save CSV results
     
     Returns:
         Dictionary with results for each dataset
@@ -372,7 +481,13 @@ def run_multi_dataset_experiment(
         config.experiment_name = f"otcfm_{dataset_name}"
         
         try:
-            results = run_comparison_experiment(config, run_baselines=True)
+            results = run_comparison_experiment(
+                config, 
+                run_baselines=True,
+                include_external=include_external,
+                include_internal=include_internal,
+                save_dir=save_dir
+            )
             all_results[dataset_name] = results
         except Exception as e:
             print(f"Error on {dataset_name}: {e}")
@@ -392,7 +507,54 @@ def run_multi_dataset_experiment(
         elif 'error' in results:
             print(f"{dataset:<20} Error: {results['error'][:40]}...")
     
+    # Save multi-dataset summary to CSV
+    save_multi_dataset_results_to_csv(all_results, save_dir=save_dir)
+    
     return all_results
+
+
+def save_multi_dataset_results_to_csv(
+    all_results: Dict,
+    save_dir: str = "results"
+) -> str:
+    """
+    Save multi-dataset experiment results to a CSV file
+    
+    Args:
+        all_results: Dictionary with dataset names as keys and method results as values
+        save_dir: Directory to save results
+    
+    Returns:
+        Path to the saved CSV file
+    """
+    rows = []
+    
+    for dataset_name, dataset_results in all_results.items():
+        if isinstance(dataset_results, dict) and 'error' not in dataset_results:
+            for method, metrics in dataset_results.items():
+                if isinstance(metrics, dict) and 'error' not in metrics:
+                    row = {
+                        'Dataset': dataset_name,
+                        'Method': method,
+                        'ACC': metrics.get('acc', metrics.get('ACC', np.nan)),
+                        'NMI': metrics.get('nmi', metrics.get('NMI', np.nan)),
+                        'ARI': metrics.get('ari', metrics.get('ARI', np.nan)),
+                        'Purity': metrics.get('purity', metrics.get('Purity', np.nan)),
+                        'F1': metrics.get('f1', metrics.get('F1', np.nan)),
+                    }
+                    rows.append(row)
+    
+    results_df = pd.DataFrame(rows)
+    if not results_df.empty:
+        results_df = results_df.sort_values(['Dataset', 'ACC'], ascending=[True, False])
+    
+    os.makedirs(save_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_path = os.path.join(save_dir, f'multi_dataset_{timestamp}.csv')
+    results_df.to_csv(results_path, index=False)
+    
+    print(f"\nMulti-dataset results saved to: {results_path}")
+    return results_path
 
 
 def main():
@@ -428,6 +590,8 @@ def main():
                         help='Include external baseline methods in comparison')
     parser.add_argument('--no_internal', action='store_true', default=False,
                         help='Exclude internal baseline methods in comparison')
+    parser.add_argument('--results_dir', type=str, default='results',
+                        help='Directory to save CSV results')
     
     args = parser.parse_args()
     
@@ -478,15 +642,21 @@ def main():
         results = run_comparison_experiment(
             config, run_baselines=True,
             include_external=args.include_external,
-            include_internal=not args.no_internal
+            include_internal=not args.no_internal,
+            save_dir=args.results_dir
         )
         
     elif args.mode == 'ablation':
-        results = run_ablation_experiment(config)
+        results = run_ablation_experiment(config, save_dir=args.results_dir)
         
     elif args.mode == 'multi':
         datasets = args.datasets or ['synthetic', 'scene15', 'caltech101']
-        results = run_multi_dataset_experiment(datasets, config)
+        results = run_multi_dataset_experiment(
+            datasets, config,
+            include_external=args.include_external,
+            include_internal=not args.no_internal,
+            save_dir=args.results_dir
+        )
     
     print("\nExperiment completed!")
 

@@ -156,6 +156,7 @@ checkpoints/
 logs/
 wandb/
 pre/
+results/
 
 # LaTeX auxiliary files
 *.aux
