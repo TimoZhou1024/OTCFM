@@ -25,7 +25,7 @@ from otcfm.config import (
 from otcfm.datasets import (
     load_caltech101, load_scene15, load_noisy_mnist,
     load_bdgp, load_cub, load_reuters, load_synthetic,
-    load_handwritten, load_coil20,
+    load_handwritten, load_coil20, load_nus_wide,
     create_dataloader, MultiViewDataset
 )
 from otcfm.ot_cfm import OTCFM
@@ -33,6 +33,13 @@ from otcfm.trainer import Trainer
 from otcfm.baselines import get_baseline_methods, run_baseline_comparison
 from otcfm.ablation import AblationStudy, AblationConfig
 from otcfm.metrics import evaluate_clustering, compare_methods, MetricTracker
+
+# Import tuned params utilities
+try:
+    from run_optuna_tuning import load_tuned_params, apply_tuned_params
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
 
 
 # Dataset loader mapping
@@ -46,6 +53,8 @@ DATASET_LOADERS = {
     'synthetic': load_synthetic,
     'handwritten': load_handwritten,
     'coil20': load_coil20,
+    'nus-wide': load_nus_wide,
+    'nuswide': load_nus_wide,
 }
 
 
@@ -592,6 +601,10 @@ def main():
                         help='Exclude internal baseline methods in comparison')
     parser.add_argument('--results_dir', type=str, default='results',
                         help='Directory to save CSV results')
+    parser.add_argument('--use_tuned', action='store_true', default=False,
+                        help='Use Optuna-tuned hyperparameters from config/tuned_params.json')
+    parser.add_argument('--tuned_config_dir', type=str, default='config',
+                        help='Directory containing tuned_params.json')
     
     args = parser.parse_args()
     
@@ -631,6 +644,22 @@ def main():
         config.training.batch_size = args.batch_size
         config.training.learning_rate = args.lr
         config.training.device = args.device
+    
+    # Apply tuned hyperparameters if requested
+    if args.use_tuned:
+        if not OPTUNA_AVAILABLE:
+            print("Warning: Optuna tuning module not available. Using default parameters.")
+        else:
+            tuned_params = load_tuned_params(args.dataset, args.tuned_config_dir)
+            if tuned_params:
+                print(f"Applying Optuna-tuned parameters for {args.dataset}")
+                config = apply_tuned_params(config, tuned_params)
+                print(f"  latent_dim: {config.model.latent_dim}")
+                print(f"  learning_rate: {config.training.learning_rate}")
+                print(f"  lambda_cluster: {config.model.lambda_cluster}")
+            else:
+                print(f"No tuned parameters found for {args.dataset}. Using defaults.")
+                print(f"Run tuning first: uv run python scripts/run_optuna_tuning.py --dataset {args.dataset}")
     
     # Run experiment based on mode
     if args.mode == 'train':

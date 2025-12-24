@@ -145,6 +145,7 @@ Thumbs.db
 Desktop.ini
 
 # Project specific
+config/
 experiments/
 data/*.pkl
 data/*.pt

@@ -13,6 +13,8 @@ Key features:
 - Gromov-Wasserstein distance for alignment-free multi-view fusion
 - End-to-end clustering with alternating optimization
 - Support for multiple benchmark datasets
+- **Optuna hyperparameter tuning** for optimal performance
+- **External SOTA baselines** integration (MFLVC, SURE, DealMVC, GCFAggMVC, DCG)
 
 ## Installation
 
@@ -35,12 +37,11 @@ Then set up the project:
 git clone https://github.com/yourusername/OT-CFM.git
 cd OT-CFM
 
-# Create virtual environment and install dependencies
-uv venv
-uv pip install -e .
+# Create virtual environment and install dependencies (one command)
+uv sync
 
-# Or install with development dependencies
-uv pip install -e ".[dev]"
+# Or install with all extras (including Optuna for tuning)
+uv sync --all-extras
 ```
 
 ### Using pip (Alternative)
@@ -59,6 +60,9 @@ source .venv/bin/activate
 
 # Install dependencies
 pip install -e .
+
+# Install with tuning support
+pip install -e ".[tuning]"
 ```
 
 ## Requirements
@@ -73,7 +77,8 @@ scikit-learn>=1.3.0
 matplotlib>=3.7.0
 tqdm>=4.65.0
 pot>=0.9.0          # Python Optimal Transport
-torchvision>=0.15.0
+pandas>=2.0.0
+optuna>=3.0.0       # Optional: for hyperparameter tuning
 ```
 
 ## Project Structure
@@ -81,29 +86,37 @@ torchvision>=0.15.0
 ```
 OT-CFM/
 ├── src/
-│   └── otcfm/              # Core package
-│       ├── __init__.py     # Package exports
-│       ├── config.py       # Configuration dataclasses
-│       ├── datasets.py     # Dataset loaders and preprocessing
-│       ├── models.py       # Neural network components
-│       ├── losses.py       # Loss functions (CFM, GW, clustering)
-│       ├── metrics.py      # Evaluation metrics (ACC, NMI, ARI, etc.)
-│       ├── ot_cfm.py       # Main OT-CFM model
-│       ├── trainer.py      # Training pipeline
-│       ├── baselines.py    # Baseline methods for comparison
-│       ├── ablation.py     # Ablation study runner
-│       ├── utils.py        # Helper functions
-│       └── visualization.py # Visualization utilities
+│   └── otcfm/                    # Core package
+│       ├── __init__.py           # Package exports
+│       ├── config.py             # Configuration dataclasses
+│       ├── datasets.py           # Dataset loaders and preprocessing
+│       ├── models.py             # Neural network components
+│       ├── losses.py             # Loss functions (CFM, GW, clustering)
+│       ├── metrics.py            # Evaluation metrics (ACC, NMI, ARI, etc.)
+│       ├── ot_cfm.py             # Main OT-CFM model
+│       ├── trainer.py            # Training pipeline
+│       ├── baselines.py          # Internal baseline methods
+│       ├── external_baselines.py # External SOTA methods wrapper
+│       ├── ablation.py           # Ablation study runner
+│       ├── utils.py              # Helper functions
+│       └── visualization.py      # Visualization utilities
 ├── scripts/
-│   └── run_experiment.py   # Main experiment runner
-├── data/                   # Dataset directory (add your datasets here)
-├── docs/                   # Documentation
-├── tests/                  # Unit tests
-├── experiments/            # Experiment outputs
-├── pyproject.toml          # Project configuration (uv/pip)
-├── requirements.txt        # Legacy requirements
-├── main.tex                # Paper source
-└── README.md               # This file
+│   ├── run_experiment.py         # Main experiment runner
+│   ├── run_optuna_tuning.py      # Optuna hyperparameter tuning
+│   └── tune_all_datasets.py      # Batch tuning for all datasets
+├── external_methods/             # External SOTA baselines (clone here)
+│   ├── MFLVC/                    # CVPR 2022
+│   ├── SURE/                     # TPAMI 2022
+│   ├── DealMVC/                  # CVPR 2023
+│   ├── GCFAggMVC/                # CVPR 2023
+│   └── 2025-AAAI-DCG/            # AAAI 2025
+├── config/                       # Tuned hyperparameters
+│   └── tuned_params.json         # Optuna tuning results
+├── results/                      # CSV experiment results
+├── data/                         # Dataset directory
+├── experiments/                  # Experiment outputs
+├── pyproject.toml                # Project configuration
+└── README.md                     # This file
 ```
 
 ## Quick Start
@@ -138,31 +151,78 @@ print(f"Final ACC: {results['final']['acc']:.4f}")
 
 ### Running Experiments via Command Line
 
+All commands use `uv run` to automatically manage the Python environment:
+
 ```bash
-# Activate virtual environment first
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-
 # Basic training
-python scripts/run_experiment.py --mode train --dataset Synthetic --epochs 200
+uv run python scripts/run_experiment.py --mode train --dataset Synthetic --epochs 200
 
-# Compare with baselines
-python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200
+# Compare with internal baselines
+uv run python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200
 
-# Compare with baselines (including external methods: MFLVC, SURE, GCFAggMVC, etc.)
-python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200 --include_external
+# Compare with external SOTA methods (MFLVC, SURE, DealMVC, GCFAggMVC, DCG)
+uv run python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200 --include_external
 
 # Compare with external methods only (exclude internal baselines)
-python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200 --include_external --no_internal
+uv run python scripts/run_experiment.py --mode compare --dataset Scene15 --epochs 200 --include_external --no_internal
 
 # Run ablation study
-python scripts/run_experiment.py --mode ablation --dataset Caltech101 --epochs 100
+uv run python scripts/run_experiment.py --mode ablation --dataset Coil20 --epochs 100
 
 # Multi-dataset experiment
-python scripts/run_experiment.py --mode multi --datasets Synthetic Scene15 Caltech101
+uv run python scripts/run_experiment.py --mode multi --datasets Synthetic Scene15 Handwritten
+
+# Specify results directory
+uv run python scripts/run_experiment.py --mode compare --dataset Handwritten --results_dir my_results
 ```
+
+### Hyperparameter Tuning (Optuna)
+
+OT-CFM supports automatic hyperparameter tuning using [Optuna](https://optuna.org/).
+
+```bash
+# Install tuning dependencies
+uv add optuna
+
+# Tune single dataset (100 trials, ~50 epochs per trial)
+uv run python scripts/run_optuna_tuning.py --dataset Handwritten --n_trials 100
+
+# Tune with fewer trials for quick testing
+uv run python scripts/run_optuna_tuning.py --dataset Coil20 --n_trials 20 --tuning_epochs 30
+
+# Tune all datasets (saves to config/tuned_params.json)
+uv run python scripts/tune_all_datasets.py --n_trials 100
+
+# Use Optuna-tuned parameters for training
+uv run python scripts/run_experiment.py --dataset Handwritten --use_tuned
+
+# Use tuned parameters with comparison mode
+uv run python scripts/run_experiment.py --mode compare --dataset Handwritten --use_tuned --include_external
+```
+
+Tuned parameters are saved to `config/tuned_params.json` and can be reused across experiments.
+
+**Tuned hyperparameters include:**
+| Category | Parameters |
+|----------|------------|
+| Model Architecture | `latent_dim`, `hidden_dims`, `flow_hidden_dim`, `flow_num_layers`, `time_dim`, `ode_steps` |
+| Loss Weights | `lambda_gw`, `lambda_cluster`, `lambda_recon`, `lambda_contrastive` |
+| Training | `learning_rate`, `weight_decay`, `batch_size`, `dropout` |
+| Kernel | `kernel_type`, `kernel_gamma` |
+
+### Results Export
+
+All experiment results are automatically saved to CSV files:
+
+```bash
+# Results saved to results/{dataset}_{timestamp}.csv
+uv run python scripts/run_experiment.py --mode compare --dataset Scene15 --include_external
+
+# Custom results directory
+uv run python scripts/run_experiment.py --mode compare --dataset Scene15 --results_dir my_results
+```
+
+CSV format includes: Method, ACC, NMI, ARI, Purity, F1
 
 ### Handling Missing Views
 
@@ -193,15 +253,57 @@ dataset = MultiViewDataset(
 ## Datasets
 
 Supported datasets:
-- **Caltech101**: 101 object categories
-- **Scene15**: 15 scene categories
-- **NoisyMNIST**: Noisy version of MNIST
-- **BDGP**: Drosophila gene expression
-- **CUB**: Caltech-UCSD Birds
-- **Reuters**: Multilingual text documents
-- **Synthetic**: Generated multi-view data
+| Dataset | Views | Samples | Clusters | Description |
+|---------|-------|---------|----------|-------------|
+| **Synthetic** | 3 | 1000 | 10 | Generated multi-view data |
+| **Handwritten** | 6 | 2000 | 10 | Handwritten digit features |
+| **Coil20** | 3 | 1440 | 20 | Object images |
+| **Scene15** | 3 | 4485 | 15 | Scene categories |
+| **NoisyMNIST** | 2 | 70000 | 10 | Noisy MNIST digits |
+| **Caltech101** | 6 | 9144 | 101 | Object categories |
+| **BDGP** | 2 | 2500 | 5 | Gene expression |
+| **Reuters** | 5 | 18758 | 6 | Multilingual documents |
 
-Place datasets in `./data/` directory.
+Place datasets in `./data/` directory in `.mat` format.
+
+## External Baseline Methods
+
+OT-CFM integrates several SOTA multi-view clustering methods for comparison:
+
+| Method | Venue | Paper |
+|--------|-------|-------|
+| **MFLVC** | CVPR 2022 | Multi-level Feature Learning for Contrastive MVC |
+| **SURE** | TPAMI 2022 | Stable and Unified Representation Enhancement |
+| **DealMVC** | CVPR 2023 | Dual Contrastive Calibration for MVC |
+| **GCFAggMVC** | CVPR 2023 | Global and Cross-view Feature Aggregation |
+| **DCG** | AAAI 2025 | Diffusion-based Incomplete MVC |
+
+To use external methods, clone them to `external_methods/`:
+
+```bash
+cd external_methods
+
+# MFLVC (CVPR 2022)
+git clone https://github.com/XLearning-SCU/2022-CVPR-MFLVC.git MFLVC
+
+# SURE (TPAMI 2022)
+git clone https://github.com/XLearning-SCU/2022-NeurIPS-SURE.git SURE
+
+# DealMVC (CVPR 2023)
+git clone https://github.com/SubmissionsIn/DealMVC.git DealMVC
+
+# GCFAggMVC (CVPR 2023)
+git clone https://github.com/Galaxy922/GCFAggMVC.git GCFAggMVC
+
+# DCG (AAAI 2025)
+git clone https://github.com/zhangyuanyang21/2025-AAAI-DCG.git 2025-AAAI-DCG
+```
+
+Then run comparison:
+
+```bash
+uv run python scripts/run_experiment.py --mode compare --dataset Scene15 --include_external
+```
 
 ## Algorithm Overview
 
@@ -225,15 +327,26 @@ Training alternates between:
 - **E-step**: Update cluster assignments
 - **M-step**: Update network parameters
 
+### Training Pipeline
+1. **Phase 1**: Reconstruction pretraining (encoder-decoder)
+2. **Phase 2**: Single-View DEC pretraining (cluster-separable latent space)
+3. **Phase 3**: Full OT-CFM training with all loss components
+
 ## Ablation Study
 
 Run ablation to evaluate component contributions:
+
+```bash
+uv run python scripts/run_experiment.py --mode ablation --dataset Coil20 --epochs 100
+```
+
+Or programmatically:
 
 ```python
 from otcfm.ablation import AblationStudy, AblationConfig
 
 ablation_config = AblationConfig(
-    modes=["full", "no_gw", "no_cluster", "no_flow"],
+    modes=["full", "no_gw", "no_cluster", "no_flow", "no_contrastive"],
     num_runs=3
 )
 
@@ -247,17 +360,19 @@ Available ablation modes:
 - `no_cluster`: Without clustering loss
 - `no_ot`: Without optimal transport
 - `no_flow`: Without flow matching
+- `no_contrastive`: Without contrastive loss
 
-## Baseline Methods
+## Internal Baseline Methods
 
 Comparison baselines implemented in `src/otcfm/baselines.py`:
-- Concat-KMeans
-- Multi-View Spectral Clustering
-- CCA-Clustering
-- Deep Multi-View Clustering (DMVC)
-- Contrastive Multi-View Clustering
-- Incomplete Multi-View Clustering
-- Unaligned Multi-View Clustering
+- **Concat-KMeans**: Concatenate views and apply KMeans
+- **Multi-View Spectral**: Spectral clustering on multi-view data
+- **CCA-Clustering**: Canonical Correlation Analysis + KMeans
+- **Weighted-View**: Weighted combination of views
+- **DMVC**: Deep Multi-View Clustering
+- **Contrastive-MVC**: Contrastive learning based MVC
+- **Incomplete-MVC**: Handles missing views
+- **Unaligned-MVC**: Handles unaligned samples
 
 ## Evaluation Metrics
 
@@ -267,6 +382,30 @@ All metrics are implemented in `src/otcfm/metrics.py`:
 - **ARI**: Adjusted Rand Index
 - **Purity**: Cluster purity
 - **F1**: Macro F1-score
+- **Silhouette**: Silhouette coefficient
+- **Davies-Bouldin**: Davies-Bouldin index
+- **Calinski-Harabasz**: Calinski-Harabasz index
+
+## Command Line Reference
+
+```bash
+# Full argument list
+uv run python scripts/run_experiment.py --help
+
+# Key arguments:
+#   --mode          : train, compare, ablation, multi
+#   --dataset       : Synthetic, Handwritten, Coil20, Scene15, NoisyMNIST, etc.
+#   --epochs        : Number of training epochs (default: 200)
+#   --batch_size    : Batch size (default: 256)
+#   --lr            : Learning rate (default: 1e-3)
+#   --device        : cuda, mps, cpu (auto-detect if not specified)
+#   --include_external : Include external SOTA baselines
+#   --no_internal   : Exclude internal baselines
+#   --use_tuned     : Use Optuna-tuned hyperparameters
+#   --results_dir   : Directory for CSV results (default: results)
+#   --missing_rate  : Missing view rate (default: 0.0)
+#   --unaligned_rate: Unaligned sample rate (default: 0.0)
+```
 
 ## Citation
 
@@ -291,3 +430,5 @@ This work builds upon:
 - [Flow Matching](https://arxiv.org/abs/2210.02747)
 - [Gromov-Wasserstein Learning](https://arxiv.org/abs/2011.01012)
 - [Python Optimal Transport](https://pythonot.github.io/)
+- [Optuna](https://optuna.org/) - Hyperparameter optimization
+- [uv](https://github.com/astral-sh/uv) - Fast Python package manager

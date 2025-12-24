@@ -31,11 +31,13 @@ class Trainer:
         model: OTCFM,
         config: TrainingConfig,
         experiment_dir: str,
-        device: str = 'cuda'
+        device: str = 'cuda',
+        verbose: bool = True
     ):
         self.model = model.to(device)
         self.config = config
         self.device = device
+        self.verbose = verbose
         self.experiment_dir = Path(experiment_dir)
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
         
@@ -122,7 +124,8 @@ class Trainer:
         dec_epochs = pretrain_epochs - recon_epochs
         
         if recon_epochs > 0:
-            print(f"Phase 1: Reconstruction pretraining for {recon_epochs} epochs...")
+            if self.verbose:
+                print(f"Phase 1: Reconstruction pretraining for {recon_epochs} epochs...")
             for epoch in range(recon_epochs):
                 self.model.train()
                 total_recon_loss = 0
@@ -158,17 +161,19 @@ class Trainer:
                     total_recon_loss += recon_loss.item()
                     num_batches += 1
                 
-                if (epoch + 1) % 5 == 0:
+                if self.verbose and (epoch + 1) % 5 == 0:
                     avg_loss = total_recon_loss / num_batches
                     print(f"  Recon epoch {epoch+1}/{recon_epochs}, Loss: {avg_loss:.4f}")
         
         # Initialize clustering centroids after reconstruction pretraining
-        print("Initializing clustering centroids...")
+        if self.verbose:
+            print("Initializing clustering centroids...")
         self.model.init_clustering(train_loader, self.device)
         
         # Phase 2: Single-View DEC pretraining (单视图聚类)
         if dec_epochs > 0:
-            print(f"Phase 2: Single-View DEC pretraining for {dec_epochs} epochs...")
+            if self.verbose:
+                print(f"Phase 2: Single-View DEC pretraining for {dec_epochs} epochs...")
             for epoch in range(dec_epochs):
                 self.model.train()
                 total_loss = 0
@@ -221,21 +226,22 @@ class Trainer:
                     total_recon_loss += recon_loss.item()
                     num_batches += 1
                 
-                if (epoch + 1) % 5 == 0:
+                if self.verbose and (epoch + 1) % 5 == 0:
                     avg_loss = total_loss / num_batches
                     avg_dec = total_dec_loss / num_batches
                     avg_recon = total_recon_loss / num_batches
                     print(f"  SV-DEC epoch {epoch+1}/{dec_epochs}, Loss: {avg_loss:.4f} (DEC: {avg_dec:.4f}, Recon: {avg_recon:.4f})")
             
             # Re-initialize centroids after SV-DEC training for better starting point
-            print("Re-initializing centroids after SV-DEC pretraining...")
+            if self.verbose:
+                print("Re-initializing centroids after SV-DEC pretraining...")
             self.model.init_clustering(train_loader, self.device)
         
         # Training loop
         best_metrics = {}
         training_history = []
         
-        pbar = tqdm(range(self.config.epochs), desc="Training")
+        pbar = tqdm(range(self.config.epochs), desc="Training", disable=not self.verbose)
         for epoch in pbar:
             self.epoch = epoch
             

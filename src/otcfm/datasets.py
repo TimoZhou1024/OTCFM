@@ -301,19 +301,86 @@ def load_reuters(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
     return views, labels
 
 
+def _extract_array(v) -> np.ndarray:
+    """Extract numpy array from various MATLAB formats"""
+    # Handle sparse matrices
+    if hasattr(v, 'toarray'):
+        v = v.toarray()
+    # Handle nested object arrays (common in MATLAB cell arrays)
+    if isinstance(v, np.ndarray) and v.dtype == object:
+        if v.shape == (1, 1):
+            return _extract_array(v[0, 0])
+        elif v.ndim == 1 and len(v) == 1:
+            return _extract_array(v[0])
+        elif v.ndim == 2 and v.shape[0] == 1:
+            return _extract_array(v[0])
+        elif v.ndim == 2 and v.shape[1] == 1:
+            return _extract_array(v[:, 0])
+    return np.array(v, dtype=np.float32)
+
+
 def load_nus_wide(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
     """Load NUS-WIDE dataset"""
     path = os.path.join(data_dir, "NUS-WIDE.mat")
     if not os.path.exists(path):
         raise FileNotFoundError(f"Please download NUS-WIDE.mat to {data_dir}")
-    
+
     data = sio.loadmat(path)
+
+    # Filter out MATLAB metadata keys
+    keys = [k for k in data.keys() if not k.startswith('__')]
+
     views = []
-    for i in range(5):
-        key = f'X{i+1}'
-        if key in data:
-            views.append(np.array(data[key], dtype=np.float32))
-    labels = np.array(data['Y']).flatten() - 1
+
+    # Check for 'fea' key (cell array containing multiple views)
+    if 'fea' in data:
+        fea = data['fea']
+        # Handle cell array format: fea is (1, n_views) or (n_views, 1) object array
+        if isinstance(fea, np.ndarray) and fea.dtype == object:
+            fea_flat = fea.flatten()
+            for i in range(len(fea_flat)):
+                v = fea_flat[i]
+                if hasattr(v, 'toarray'):
+                    v = v.toarray()
+                v = np.array(v, dtype=np.float32)
+                if v.ndim == 2:
+                    views.append(v)
+
+    # If 'fea' not found or didn't work, try numbered patterns
+    if not views:
+        import re
+        for pattern in [r'X(\d+)', r'x(\d+)', r'fea(\d+)', r'view(\d+)']:
+            matches = [(k, int(re.match(pattern, k).group(1))) for k in keys if re.match(pattern, k)]
+            if matches:
+                view_keys = [k for k, _ in sorted(matches, key=lambda x: x[1])]
+                for key in view_keys:
+                    try:
+                        v = _extract_array(data[key])
+                        if v.ndim == 2:
+                            views.append(v)
+                    except (ValueError, TypeError):
+                        continue
+                break
+
+    # Try to find label key
+    labels = None
+    for label_key in ['Y', 'y', 'gt', 'gnd', 'label', 'labels', 'truth']:
+        if label_key in data:
+            lbl = data[label_key]
+            if hasattr(lbl, 'toarray'):
+                lbl = lbl.toarray()
+            labels = np.array(lbl).flatten()
+            # Adjust to 0-indexed if needed
+            if labels.min() >= 1:
+                labels = labels - 1
+            break
+
+    if labels is None:
+        raise KeyError(f"Cannot find label key in {path}. Available keys: {keys}")
+
+    if not views:
+        raise KeyError(f"Cannot find view keys in {path}. Available keys: {keys}")
+
     return views, labels
 
 
