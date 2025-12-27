@@ -14,7 +14,7 @@ Key features:
 - End-to-end clustering with alternating optimization
 - Support for multiple benchmark datasets
 - **Optuna hyperparameter tuning** for optimal performance
-- **External SOTA baselines** integration (MFLVC, SURE, DealMVC, GCFAggMVC, DCG)
+- **External SOTA baselines** integration (MFLVC, SURE, DealMVC, GCFAggMVC, DCG, MRG-UMC, CANDY)
 
 ## Installation
 
@@ -103,13 +103,16 @@ OT-CFM/
 ├── scripts/
 │   ├── run_experiment.py         # Main experiment runner
 │   ├── run_optuna_tuning.py      # Optuna hyperparameter tuning
-│   └── tune_all_datasets.py      # Batch tuning for all datasets
+│   ├── tune_all_datasets.py      # Batch tuning for all datasets
+│   └── run_robustness_test.py    # Robustness testing (incomplete & unaligned data)
 ├── external_methods/             # External SOTA baselines (clone here)
 │   ├── MFLVC/                    # CVPR 2022
 │   ├── SURE/                     # TPAMI 2022
 │   ├── DealMVC/                  # CVPR 2023
 │   ├── GCFAggMVC/                # CVPR 2023
-│   └── 2025-AAAI-DCG/            # AAAI 2025
+│   ├── 2025-AAAI-DCG/            # AAAI 2025
+│   ├── MRG-UMC/                  # TNNLS 2025
+│   └── 2024-NeurIPS-CANDY/       # NeurIPS 2024
 ├── config/                       # Tuned hyperparameters
 │   └── tuned_params.json         # Optuna tuning results
 ├── results/                      # CSV experiment results
@@ -250,6 +253,64 @@ dataset = MultiViewDataset(
 # GW alignment handles cross-view correspondences
 ```
 
+### Robustness Testing
+
+OT-CFM provides comprehensive robustness testing to evaluate model performance under challenging conditions:
+
+#### Incomplete Data Test (Missing Views)
+Tests how well the model handles missing view data at various missing rates η ∈ {0.1, 0.3, 0.5, 0.7}.
+
+```bash
+# Run incomplete data test
+uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15
+
+# Custom missing rates
+uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15 \
+    --missing_rates 0.0 0.2 0.4 0.6 0.8
+
+# Include external baselines for comparison
+uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15 \
+    --include_external --epochs 100 --num_runs 3
+```
+
+#### Unaligned Data Test (Shuffled Samples)  
+Tests the model's ability to handle sample misalignment across views at shuffle rates p ∈ {0%, 20%, 40%, 60%}.
+
+```bash
+# Run unaligned data test
+uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Scene15
+
+# Custom unaligned rates
+uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Scene15 \
+    --unaligned_rates 0.0 0.2 0.4 0.6 0.8
+```
+
+#### Run Both Tests
+```bash
+# Run both incomplete and unaligned tests
+uv run python scripts/run_robustness_test.py --test_type both --dataset Scene15 \
+    --include_external --epochs 100 --num_runs 3
+
+# Full robustness test command
+uv run python scripts/run_robustness_test.py --test_type both \
+    --dataset Scene15 \
+    --epochs 100 \
+    --num_runs 3 \
+    --include_external \
+    --save_dir results/robustness
+```
+
+#### Output Files
+Results are saved to `results/robustness/`:
+- **CSV**: `{dataset}_{test_type}_{timestamp}.csv` - Tabular results
+- **JSON**: `{dataset}_{test_type}_{timestamp}.json` - Structured data for analysis
+- **PNG/PDF**: `{dataset}_{test_type}_{timestamp}.png` - Visualization plots
+- **Combined**: `{dataset}_robustness_combined_{timestamp}.png` - 2x2 overview plot
+
+#### Expected Results
+- **Incomplete Data**: All methods degrade as missing rate increases, but OT-CFM should show the most gradual decline due to its flow-based imputation.
+- **Unaligned Data**: Most methods collapse when p > 0, while OT-CFM maintains high performance due to its Landmark OT alignment mechanism - this is the key differentiator.
+
 ## Datasets
 
 Supported datasets:
@@ -276,7 +337,9 @@ OT-CFM integrates several SOTA multi-view clustering methods for comparison:
 | **SURE** | TPAMI 2022 | Stable and Unified Representation Enhancement |
 | **DealMVC** | CVPR 2023 | Dual Contrastive Calibration for MVC |
 | **GCFAggMVC** | CVPR 2023 | Global and Cross-view Feature Aggregation |
+| **CANDY** | NeurIPS 2024 | Robust Contrastive MVC against Dual Noisy Correspondence |
 | **DCG** | AAAI 2025 | Diffusion-based Incomplete MVC |
+| **MRG-UMC** | TNNLS 2025 | Multi-level Reliable Guidance for Unpaired MVC |
 
 To use external methods, clone them to `external_methods/`:
 
@@ -297,6 +360,12 @@ git clone https://github.com/Galaxy922/GCFAggMVC.git GCFAggMVC
 
 # DCG (AAAI 2025)
 git clone https://github.com/zhangyuanyang21/2025-AAAI-DCG.git 2025-AAAI-DCG
+
+# MRG-UMC (TNNLS 2025)
+git clone https://github.com/LikeXin94/MRG-UMC.git MRG-UMC
+
+# CANDY (NeurIPS 2024)
+git clone https://github.com/XLearning-SCU/2024-NeurIPS-CANDY.git 2024-NeurIPS-CANDY
 ```
 
 Then run comparison:
