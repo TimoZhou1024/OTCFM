@@ -229,7 +229,7 @@ class RobustnessTest:
     ) -> Dict:
         """Run baseline methods with specified settings"""
         np.random.seed(seed)
-        
+
         # Create dataset with perturbation
         dataset = MultiViewDataset(
             views=self.views,
@@ -238,7 +238,10 @@ class RobustnessTest:
             unaligned_rate=unaligned_rate,
             seed=seed
         )
-        
+
+        # Get missing mask
+        mask = dataset.missing_mask.numpy() if missing_rate > 0 else None
+
         # For baselines, we pass the UNALIGNED views directly
         # This simulates the real scenario where baselines don't know the correct alignment
         # The perturbed views have the same indices but different content due to shuffling
@@ -249,10 +252,16 @@ class RobustnessTest:
             view_data = dataset.views[v_idx].numpy()
             # The view_data is already normalized, apply permutation to get unaligned version
             perturbed_view = view_data[perm]
+
+            # Apply missing mask: zero out missing entries
+            # This simulates the real scenario where missing views are unavailable
+            if mask is not None:
+                view_mask = mask[:, v_idx]  # [N] mask for this view
+                perturbed_view = perturbed_view.copy()  # Don't modify original
+                perturbed_view[view_mask == 0] = 0.0  # Zero out missing samples
+
             perturbed_views.append(perturbed_view)
-        
-        mask = dataset.missing_mask.numpy() if missing_rate > 0 else None
-        
+
         results = run_baseline_comparison(
             perturbed_views,
             self.labels,
@@ -262,7 +271,7 @@ class RobustnessTest:
             include_external=self.include_external,
             include_internal=self.include_internal
         )
-        
+
         return results
     
     def run_incomplete_test(
