@@ -1269,6 +1269,608 @@ class DCGWrapper(BaseClusteringMethod):
 
 
 # ============================================================
+# MRG-UMC: Multi-level Reliable Guidance for Unpaired MVC
+# Paper: IEEE TNNLS 2025
+# GitHub: https://github.com/LikeXin94/MRG-UMC
+# ============================================================
+
+class MRGUMCWrapper(BaseClusteringMethod):
+    """
+    MRG-UMC: Multi-level Reliable Guidance for Unpaired Multi-view Clustering
+    
+    This method uses multi-level reliable guidance to handle unpaired/unaligned
+    multi-view data through autoencoders with cross-view prediction and
+    contrastive learning.
+    
+    Reference:
+        Li et al., "Multi-level Reliable Guidance for Unpaired Multi-view 
+        Clustering", IEEE TNNLS 2025
+    """
+    
+    def __init__(self, num_clusters: int, epochs: int = 200,
+                 latent_dim: int = 128, batch_size: int = 256,
+                 lr: float = 1e-4, lambda_z_norm: float = 1e-4,
+                 lambda_inter: float = 1e-4, lambda_cross: float = 1e-4,
+                 lambda_guidance: float = 1e4, tau: float = 0.1,
+                 device: str = 'cuda'):
+        super().__init__(num_clusters)
+        self.epochs = epochs
+        self.latent_dim = latent_dim
+        self.batch_size = batch_size
+        self.lr = lr
+        self.lambda_z_norm = lambda_z_norm
+        self.lambda_inter = lambda_inter
+        self.lambda_cross = lambda_cross
+        self.lambda_guidance = lambda_guidance
+        self.tau = tau
+        self.device = device
+        self.embeddings_ = None
+        
+    def fit_predict(self, views: List[np.ndarray], 
+                    mask: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+        mrgumc_path = EXTERNAL_PATH / "MRG-UMC"
+        
+        if not mrgumc_path.exists():
+            print(f"MRG-UMC not found. Clone it with:")
+            print(f"  git clone https://github.com/LikeXin94/MRG-UMC.git {mrgumc_path}")
+            self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+            return self.labels_
+        
+        # Override with kwargs
+        epochs = kwargs.get('epochs', self.epochs)
+        batch_size = kwargs.get('batch_size', self.batch_size)
+        lr = kwargs.get('lr', self.lr)
+        device = kwargs.get('device', self.device)
+        
+        try:
+            # Prepare data
+            view_dims = [v.shape[1] for v in views]
+            n_views = len(views)
+            n_samples = views[0].shape[0]
+            
+            # Define Autoencoder (similar to MRG-UMC)
+            class Autoencoder(nn.Module):
+                def __init__(self, encoder_dim, activation='relu', batchnorm=True):
+                    super().__init__()
+                    depth = len(encoder_dim) - 1
+                    
+                    # Encoder
+                    encoder_layers = []
+                    for i in range(depth):
+                        encoder_layers.append(nn.Linear(encoder_dim[i], encoder_dim[i + 1]))
+                        if i < depth - 1:
+                            if batchnorm:
+                                encoder_layers.append(nn.BatchNorm1d(encoder_dim[i + 1]))
+                            encoder_layers.append(nn.ReLU())
+                    encoder_layers.append(nn.Softmax(dim=1))
+                    self.encoder = nn.Sequential(*encoder_layers)
+                    
+                    # Decoder
+                    decoder_dim = list(reversed(encoder_dim))
+                    decoder_layers = []
+                    for i in range(depth):
+                        decoder_layers.append(nn.Linear(decoder_dim[i], decoder_dim[i + 1]))
+                        if batchnorm:
+                            decoder_layers.append(nn.BatchNorm1d(decoder_dim[i + 1]))
+                        decoder_layers.append(nn.ReLU())
+                    self.decoder = nn.Sequential(*decoder_layers)
+                    
+                def forward(self, x):
+                    z = self.encoder(x)
+                    xr = self.decoder(z)
+                    return xr, z
+            
+            class Prediction(nn.Module):
+                """Cross-view prediction module"""
+                def __init__(self, dim_list, activation='relu', batchnorm=True):
+                    super().__init__()
+                    depth = len(dim_list) - 1
+                    layers = []
+                    for i in range(depth):
+                        layers.append(nn.Linear(dim_list[i], dim_list[i + 1]))
+                        if batchnorm:
+                            layers.append(nn.BatchNorm1d(dim_list[i + 1]))
+                        if i < depth - 1:
+                            layers.append(nn.ReLU())
+                    layers.append(nn.Softmax(dim=1))
+                    self.net = nn.Sequential(*layers)
+                    
+                def forward(self, x):
+                    return self.net(x)
+            
+            # Determine architecture based on view dimensions
+            def get_encoder_arch(input_dim, latent_dim):
+                if input_dim > 1000:
+                    return [input_dim, 1024, 1024, 1024, latent_dim]
+                elif input_dim > 500:
+                    return [input_dim, 512, 512, latent_dim]
+                else:
+                    return [input_dim, 256, 256, latent_dim]
+            
+            # Create autoencoders for each view
+            autoencoders = []
+            for v in range(n_views):
+                arch = get_encoder_arch(view_dims[v], self.latent_dim)
+                ae = Autoencoder(arch).to(device)
+                autoencoders.append(ae)
+            
+            # Create prediction modules (for cross-view prediction)
+            predictions = nn.ModuleList()
+            for v in range(n_views):
+                pred = Prediction([self.latent_dim, 256, self.latent_dim]).to(device)
+                predictions.append(pred)
+            predictions = predictions.to(device)
+            
+            # Create dataset
+            class CustomDataset(torch.utils.data.Dataset):
+                def __init__(self, views_data):
+                    self.views = [torch.FloatTensor(StandardScaler().fit_transform(v)) 
+                                  for v in views_data]
+                    self.n_samples = views_data[0].shape[0]
+                def __len__(self):
+                    return self.n_samples
+                def __getitem__(self, idx):
+                    return [v[idx] for v in self.views], idx
+            
+            dataset = CustomDataset(views)
+            data_loader = torch.utils.data.DataLoader(
+                dataset, batch_size=min(batch_size, n_samples // 2),
+                shuffle=True, drop_last=True
+            )
+            
+            # Optimizer
+            all_params = []
+            for ae in autoencoders:
+                all_params.extend(ae.parameters())
+            all_params.extend(predictions.parameters())
+            optimizer = torch.optim.Adam(all_params, lr=lr)
+            
+            mse_loss = nn.MSELoss()
+            
+            # Contrastive loss
+            def contrastive_loss(z1, z2, tau=self.tau):
+                z1_norm = F.normalize(z1, dim=1)
+                z2_norm = F.normalize(z2, dim=1)
+                N = z1.size(0)
+                
+                logits = torch.mm(z1_norm, z2_norm.t()) / tau
+                labels = torch.arange(N, device=device)
+                loss = F.cross_entropy(logits, labels)
+                return loss
+            
+            print(f"  MRG-UMC Training ({epochs} epochs)...")
+            
+            # Phase 1: Reconstruction pretraining
+            pretrain_epochs = min(50, epochs // 4)
+            print(f"    Phase 1: Pretraining ({pretrain_epochs} epochs)...")
+            for epoch in range(pretrain_epochs):
+                for ae in autoencoders:
+                    ae.train()
+                
+                for xs, _ in data_loader:
+                    xs = [x.to(device) for x in xs]
+                    optimizer.zero_grad()
+                    
+                    loss = 0
+                    for v in range(n_views):
+                        xr, z = autoencoders[v](xs[v])
+                        loss += mse_loss(xr, xs[v])
+                    
+                    loss.backward()
+                    optimizer.step()
+            
+            # Phase 2: Joint training with multi-level guidance
+            main_epochs = epochs - pretrain_epochs
+            print(f"    Phase 2: Joint training ({main_epochs} epochs)...")
+            for epoch in range(main_epochs):
+                for ae in autoencoders:
+                    ae.train()
+                predictions.train()
+                
+                total_loss = 0
+                for xs, _ in data_loader:
+                    xs = [x.to(device) for x in xs]
+                    optimizer.zero_grad()
+                    
+                    # Get latent representations
+                    zs = []
+                    xrs = []
+                    for v in range(n_views):
+                        xr, z = autoencoders[v](xs[v])
+                        zs.append(z)
+                        xrs.append(xr)
+                    
+                    # Reconstruction loss
+                    loss_rec = sum(mse_loss(xrs[v], xs[v]) for v in range(n_views))
+                    
+                    # Z-norm orthogonal constraint
+                    loss_z_norm = 0
+                    for z in zs:
+                        gram = torch.mm(z.t(), z)
+                        eye = torch.eye(z.size(1), device=device)
+                        loss_z_norm += torch.norm(gram - eye)
+                    loss_z_norm = self.lambda_z_norm * loss_z_norm / n_views
+                    
+                    # Inner-view contrastive (multi-level clustering)
+                    loss_inter = 0
+                    for v in range(n_views):
+                        # Predict cross-view representation
+                        z_pred = predictions[v](zs[v])
+                        # Contrastive between original and predicted
+                        loss_inter += contrastive_loss(zs[v], z_pred)
+                    loss_inter = self.lambda_inter * loss_inter / n_views
+                    
+                    # Cross-view contrastive guidance
+                    loss_cross = 0
+                    for v1 in range(n_views):
+                        for v2 in range(v1 + 1, n_views):
+                            # Cross-view prediction
+                            z1_pred = predictions[v2](zs[v1])
+                            z2_pred = predictions[v1](zs[v2])
+                            # Alignment loss
+                            loss_cross += contrastive_loss(zs[v1], z2_pred)
+                            loss_cross += contrastive_loss(zs[v2], z1_pred)
+                    num_pairs = n_views * (n_views - 1) / 2
+                    loss_cross = self.lambda_cross * loss_cross / max(num_pairs, 1)
+                    
+                    # Multi-level reliable guidance (synthesized view alignment)
+                    loss_guidance = 0
+                    z_avg = sum(zs) / n_views
+                    for v in range(n_views):
+                        loss_guidance += mse_loss(zs[v], z_avg.detach())
+                    loss_guidance = self.lambda_guidance * loss_guidance / n_views
+                    
+                    loss = loss_rec + loss_z_norm + loss_inter + loss_cross + loss_guidance
+                    loss.backward()
+                    optimizer.step()
+                    
+                    total_loss += loss.item()
+                
+                if (epoch + 1) % 50 == 0:
+                    print(f"    Epoch {epoch+1}/{main_epochs}, Loss: {total_loss/len(data_loader):.4f}")
+            
+            # Get final embeddings (concatenate all view latents)
+            for ae in autoencoders:
+                ae.eval()
+            full_loader = torch.utils.data.DataLoader(dataset, batch_size=n_samples, shuffle=False)
+            
+            with torch.no_grad():
+                for xs, _ in full_loader:
+                    xs = [x.to(device) for x in xs]
+                    zs = []
+                    for v in range(n_views):
+                        _, z = autoencoders[v](xs[v])
+                        zs.append(z)
+                    # Concatenate all view representations
+                    self.embeddings_ = torch.cat(zs, dim=1).cpu().numpy()
+            
+            # Clustering
+            self.labels_ = KMeans(n_clusters=self.num_clusters, n_init=10,
+                                  random_state=42).fit_predict(self.embeddings_)
+            
+            print(f"  MRG-UMC completed. Found {len(np.unique(self.labels_))} clusters.")
+            return self.labels_
+            
+        except Exception as e:
+            import traceback
+            print(f"MRG-UMC execution failed: {e}")
+            traceback.print_exc()
+            self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+            return self.labels_
+    
+    def get_embeddings(self) -> Optional[np.ndarray]:
+        return self.embeddings_
+
+
+# ============================================================
+# CANDY: Contextually-spectral based correspondence refinery
+# Paper: NeurIPS 2024
+# GitHub: https://github.com/XLearning-SCU/2024-NeurIPS-CANDY
+# ============================================================
+
+class CANDYWrapper(BaseClusteringMethod):
+    """
+    CANDY: Robust Contrastive Multi-view Clustering against Dual Noisy Correspondence
+    
+    This method handles noisy correspondences (both false positives and false negatives)
+    using contextually-spectral based correspondence refinery with robust affinity
+    learning and denoising contrastive loss.
+    
+    Reference:
+        Guo et al., "Robust Contrastive Multi-view Clustering against Dual Noisy 
+        Correspondence", NeurIPS 2024
+    """
+    
+    def __init__(self, num_clusters: int, epochs: int = 200,
+                 feature_dim: int = 128, batch_size: int = 256,
+                 lr: float = 1e-3, temperature: float = 0.07,
+                 momentum: float = 0.99, warmup_epochs: int = 20,
+                 singular_thresh: float = 0.2, drop_rate: float = 0.5,
+                 device: str = 'cuda'):
+        super().__init__(num_clusters)
+        self.epochs = epochs
+        self.feature_dim = feature_dim
+        self.batch_size = batch_size
+        self.lr = lr
+        self.temperature = temperature
+        self.momentum = momentum
+        self.warmup_epochs = warmup_epochs
+        self.singular_thresh = singular_thresh
+        self.drop_rate = drop_rate
+        self.device = device
+        self.embeddings_ = None
+        
+    def fit_predict(self, views: List[np.ndarray], 
+                    mask: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+        candy_path = EXTERNAL_PATH / "2024-NeurIPS-CANDY"
+        
+        if not candy_path.exists():
+            print(f"CANDY not found. Clone it with:")
+            print(f"  git clone https://github.com/XLearning-SCU/2024-NeurIPS-CANDY.git {candy_path}")
+            self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+            return self.labels_
+        
+        # Override with kwargs
+        epochs = kwargs.get('epochs', self.epochs)
+        batch_size = kwargs.get('batch_size', self.batch_size)
+        lr = kwargs.get('lr', self.lr)
+        device = kwargs.get('device', self.device)
+        
+        try:
+            import copy
+            
+            # Prepare data
+            view_dims = [v.shape[1] for v in views]
+            n_views = len(views)
+            n_samples = views[0].shape[0]
+            
+            # CANDY is designed for 2 views, but we can adapt for more
+            if n_views < 2:
+                print(f"  CANDY requires at least 2 views, got {n_views}. Using fallback.")
+                self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+                return self.labels_
+            
+            # Define FCN encoder (similar to CANDY)
+            class FCN(nn.Module):
+                def __init__(self, dim_layer, drop_out=0.5):
+                    super().__init__()
+                    layers = []
+                    for i in range(1, len(dim_layer) - 1):
+                        layers.append(nn.Linear(dim_layer[i - 1], dim_layer[i], bias=False))
+                        layers.append(nn.BatchNorm1d(dim_layer[i]))
+                        layers.append(nn.ReLU())
+                        if drop_out != 0.0 and i != len(dim_layer) - 2:
+                            layers.append(nn.Dropout(drop_out))
+                    layers.append(nn.Linear(dim_layer[-2], dim_layer[-1], bias=False))
+                    layers.append(nn.BatchNorm1d(dim_layer[-1], affine=False))
+                    self.ffn = nn.Sequential(*layers)
+                    
+                def forward(self, x):
+                    return self.ffn(x)
+            
+            class MLP(nn.Module):
+                def __init__(self, dim_in, dim_out=None, hidden_ratio=4.0):
+                    super().__init__()
+                    dim_out = dim_out or dim_in
+                    dim_hidden = int(dim_in * hidden_ratio)
+                    self.mlp = nn.Sequential(
+                        nn.Linear(dim_in, dim_hidden),
+                        nn.ReLU(),
+                        nn.Linear(dim_hidden, dim_out)
+                    )
+                def forward(self, x):
+                    return self.mlp(x)
+            
+            # Build layer dimensions for each view
+            layer_dims = []
+            for v_dim in view_dims:
+                if v_dim > 1000:
+                    dims = [v_dim, 1024, 512, self.feature_dim]
+                elif v_dim > 500:
+                    dims = [v_dim, 512, 256, self.feature_dim]
+                else:
+                    dims = [v_dim, 256, 128, self.feature_dim]
+                layer_dims.append(dims)
+            
+            # CANDY Model
+            class CANDYModel(nn.Module):
+                def __init__(self, n_views, layer_dims, temperature, drop_rate):
+                    super().__init__()
+                    self.n_views = n_views
+                    
+                    self.online_encoder = nn.ModuleList(
+                        [FCN(layer_dims[i], drop_out=drop_rate) for i in range(n_views)]
+                    )
+                    self.target_encoder = copy.deepcopy(self.online_encoder)
+                    
+                    for param_q, param_k in zip(
+                        self.online_encoder.parameters(), self.target_encoder.parameters()
+                    ):
+                        param_k.data.copy_(param_q.data)
+                        param_k.requires_grad = False
+                    
+                    self.cross_view_decoder = nn.ModuleList(
+                        [MLP(layer_dims[i][-1], layer_dims[i][-1]) for i in range(n_views)]
+                    )
+                    
+                    self.temperature = temperature
+                    self.feature_dim = [layer_dims[i][-1] for i in range(n_views)]
+                
+                @torch.no_grad()
+                def update_target(self, momentum):
+                    for i in range(self.n_views):
+                        for param_o, param_t in zip(
+                            self.online_encoder[i].parameters(),
+                            self.target_encoder[i].parameters()
+                        ):
+                            param_t.data = param_t.data * momentum + param_o.data * (1 - momentum)
+                
+                @torch.no_grad()
+                def robust_affinity(self, z1, z2, t=0.07):
+                    """Compute robust affinity matrices"""
+                    G_intra, G_inter = [], []
+                    z1 = [F.normalize(z1[i], dim=1) for i in range(len(z1))]
+                    z2 = [F.normalize(z2[i], dim=1) for i in range(len(z2))]
+                    
+                    for i in range(len(z1)):
+                        for j in range(len(z2)):
+                            if i == j:
+                                G = (2 - 2 * (z2[i] @ z2[j].t())).clamp(min=0.0)
+                                G = torch.exp(-G / t)
+                                G[torch.eye(G.shape[0], device=G.device) > 0] = 1.0
+                                G = G / G.sum(1, keepdim=True).clamp_min(1e-7)
+                                G_intra.append(G)
+                            else:
+                                G = (2 - 2 * (z1[i] @ z2[j].t())).clamp(min=0.0)
+                                G = torch.exp(-G / t)
+                                diag_mask = torch.eye(G.shape[0], device=G.device) > 0
+                                G[diag_mask] = G[diag_mask] / G.diag().max().clamp_min(1e-7).detach()
+                                G = G / G.sum(1, keepdim=True).clamp_min(1e-7)
+                                G_inter.append(G)
+                    
+                    return G_intra, G_inter
+                
+                def forward(self, data, momentum, warm_up, singular_thresh):
+                    self.update_target(momentum)
+                    
+                    z = [self.online_encoder[i](data[i]) for i in range(self.n_views)]
+                    p = [self.cross_view_decoder[i](z[i]) for i in range(self.n_views)]
+                    z_t = [self.target_encoder[i](data[i]) for i in range(self.n_views)]
+                    
+                    if warm_up:
+                        N = z[0].shape[0]
+                        mp_intra = [torch.eye(N, device=z[0].device) for _ in range(self.n_views)]
+                        mp_inter = mp_intra
+                    else:
+                        mp_intra, mp_inter = self.robust_affinity(p, z_t, self.temperature)
+                    
+                    # Contrastive losses
+                    cc_loss, id_loss = 0.0, 0.0
+                    
+                    for i in range(self.n_views):
+                        for j in range(self.n_views):
+                            if i == j:
+                                # Intra-view identity loss
+                                id_loss += self._denoise_contrastive(
+                                    z[i], z_t[i],
+                                    mp_intra[i].mm(mp_intra[j].t()),
+                                    singular_thresh, enable_denoise=False
+                                )
+                            else:
+                                # Cross-view correspondence loss
+                                pos_mask = mp_inter[i % len(mp_inter)].mm(mp_intra[j].t())
+                                pos_mask = pos_mask + 0.2 * torch.eye(
+                                    pos_mask.shape[0], device=pos_mask.device
+                                )
+                                cc_loss += self._denoise_contrastive(
+                                    p[i], z_t[j], pos_mask, singular_thresh, enable_denoise=True
+                                )
+                    
+                    cc_loss = cc_loss / self.n_views
+                    id_loss = id_loss / self.n_views
+                    
+                    return cc_loss + id_loss
+                
+                def _denoise_contrastive(self, query, key, mask_pos, singular_thresh, enable_denoise=True):
+                    """Denoising contrastive loss"""
+                    query = F.normalize(query, dim=1)
+                    key = F.normalize(key, dim=1)
+                    
+                    similarity = (query @ key.t() / self.temperature).softmax(1)
+                    logp = -similarity.log()
+                    
+                    L = mask_pos
+                    if enable_denoise:
+                        # SVD-based denoising
+                        try:
+                            U, S, Vh = torch.linalg.svd(L)
+                            S[S < singular_thresh] = 0
+                            L = U @ torch.diag(S) @ Vh
+                        except:
+                            pass  # Keep L unchanged if SVD fails
+                    
+                    L = L / L.sum(dim=1, keepdim=True).clamp_min(1e-7)
+                    loss = (L * logp).mean()
+                    return loss
+                
+                @torch.no_grad()
+                def extract_feature(self, data):
+                    """Extract features for clustering"""
+                    z = [self.target_encoder[i](data[i]) for i in range(self.n_views)]
+                    z = [F.normalize(z[i], dim=1) for i in range(self.n_views)]
+                    return z
+            
+            # Create dataset
+            class CustomDataset(torch.utils.data.Dataset):
+                def __init__(self, views_data):
+                    self.views = [torch.FloatTensor(StandardScaler().fit_transform(v)) 
+                                  for v in views_data]
+                    self.n_samples = views_data[0].shape[0]
+                def __len__(self):
+                    return self.n_samples
+                def __getitem__(self, idx):
+                    return [v[idx] for v in self.views], idx
+            
+            dataset = CustomDataset(views)
+            data_loader = torch.utils.data.DataLoader(
+                dataset, batch_size=min(batch_size, n_samples // 2),
+                shuffle=True, drop_last=True
+            )
+            
+            # Initialize model
+            model = CANDYModel(n_views, layer_dims, self.temperature, self.drop_rate).to(device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            
+            print(f"  CANDY Training ({epochs} epochs)...")
+            
+            for epoch in range(epochs):
+                model.train()
+                warm_up = epoch < self.warmup_epochs
+                
+                total_loss = 0
+                for xs, _ in data_loader:
+                    xs = [x.to(device) for x in xs]
+                    optimizer.zero_grad()
+                    
+                    loss = model(xs, self.momentum, warm_up, self.singular_thresh)
+                    loss.backward()
+                    optimizer.step()
+                    
+                    total_loss += loss.item()
+                
+                if (epoch + 1) % 50 == 0:
+                    print(f"    Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(data_loader):.4f}")
+            
+            # Get final embeddings
+            model.eval()
+            full_loader = torch.utils.data.DataLoader(dataset, batch_size=n_samples, shuffle=False)
+            
+            with torch.no_grad():
+                for xs, _ in full_loader:
+                    xs = [x.to(device) for x in xs]
+                    zs = model.extract_feature(xs)
+                    # Concatenate all view features
+                    self.embeddings_ = torch.cat(zs, dim=1).cpu().numpy()
+            
+            # Clustering
+            self.labels_ = KMeans(n_clusters=self.num_clusters, n_init=10,
+                                  random_state=42).fit_predict(self.embeddings_)
+            
+            print(f"  CANDY completed. Found {len(np.unique(self.labels_))} clusters.")
+            return self.labels_
+            
+        except Exception as e:
+            import traceback
+            print(f"CANDY execution failed: {e}")
+            traceback.print_exc()
+            self.labels_, self.embeddings_ = fallback_kmeans(views, self.num_clusters)
+            return self.labels_
+    
+    def get_embeddings(self) -> Optional[np.ndarray]:
+        return self.embeddings_
+
+
+# ============================================================
 # Registry: Get all available external methods
 # ============================================================
 
@@ -1300,6 +1902,8 @@ def get_external_baselines(
         ("COMPLETER", "COMPLETER (CVPR21)", COMPLETERWrapper),
         ("GCFAggMVC", "GCFAggMVC (CVPR23)", GCFAggMVCWrapper),
         ("2025-AAAI-DCG", "DCG (AAAI25)", DCGWrapper),
+        ("MRG-UMC", "MRG-UMC (TNNLS25)", MRGUMCWrapper),
+        ("2024-NeurIPS-CANDY", "CANDY (NeurIPS24)", CANDYWrapper),
     ]
     
     for folder_name, display_name, wrapper_class in method_configs:
@@ -1318,7 +1922,7 @@ def list_available_external_methods() -> List[str]:
     """List all external methods that are available (code exists)"""
     available = []
     
-    method_folders = ["MFLVC", "SURE", "DealMVC", "COMPLETER", "GCFAggMVC", "2025-AAAI-DCG"]
+    method_folders = ["MFLVC", "SURE", "DealMVC", "COMPLETER", "GCFAggMVC", "2025-AAAI-DCG", "MRG-UMC", "2024-NeurIPS-CANDY"]
     
     for folder in method_folders:
         if (EXTERNAL_PATH / folder).exists():
@@ -1338,6 +1942,8 @@ def list_missing_external_methods() -> Dict[str, str]:
         "COMPLETER": "https://github.com/XLearning-SCU/2021-CVPR-Completer.git",
         "GCFAggMVC": "https://github.com/Galaxy922/GCFAggMVC.git",
         "2025-AAAI-DCG": "https://github.com/zhangyuanyang21/2025-AAAI-DCG.git",
+        "MRG-UMC": "https://github.com/LikeXin94/MRG-UMC.git",
+        "2024-NeurIPS-CANDY": "https://github.com/XLearning-SCU/2024-NeurIPS-CANDY.git",
     }
     
     for name, repo in method_repos.items():

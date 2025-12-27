@@ -37,27 +37,27 @@ class BaseClusteringMethod(ABC):
 
 class ConcatKMeans(BaseClusteringMethod):
     """Simple baseline: concatenate all views and apply K-Means"""
-    
+
     def __init__(self, num_clusters: int, n_init: int = 10):
         super().__init__(num_clusters)
         self.n_init = n_init
         self.embeddings_ = None
-    
-    def fit_predict(self, views: List[np.ndarray], **kwargs) -> np.ndarray:
+
+    def fit_predict(self, views: List[np.ndarray], mask: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
         # Normalize each view
         normalized = []
         for v in views:
             scaler = StandardScaler()
             normalized.append(scaler.fit_transform(v))
-        
+
         # Concatenate
         X = np.concatenate(normalized, axis=1)
-        
+
         # Apply K-Means
         kmeans = KMeans(n_clusters=self.num_clusters, n_init=self.n_init)
         self.labels_ = kmeans.fit_predict(X)
         self.embeddings_ = X
-        
+
         return self.labels_
     
     def get_embeddings(self) -> np.ndarray:
@@ -66,25 +66,25 @@ class ConcatKMeans(BaseClusteringMethod):
 
 class MultiViewSpectral(BaseClusteringMethod):
     """Multi-view spectral clustering with affinity fusion"""
-    
+
     def __init__(self, num_clusters: int, n_neighbors: int = 10):
         super().__init__(num_clusters)
         self.n_neighbors = n_neighbors
         self.embeddings_ = None
-    
+
     def _compute_affinity(self, X: np.ndarray) -> np.ndarray:
         """Compute RBF affinity matrix"""
         from sklearn.metrics.pairwise import rbf_kernel
         gamma = 1.0 / X.shape[1]
         return rbf_kernel(X, gamma=gamma)
-    
-    def fit_predict(self, views: List[np.ndarray], **kwargs) -> np.ndarray:
+
+    def fit_predict(self, views: List[np.ndarray], mask: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
         # Compute affinity matrix for each view
         affinities = [self._compute_affinity(v) for v in views]
-        
+
         # Fuse affinities (simple average)
         fused_affinity = np.mean(affinities, axis=0)
-        
+
         # Apply spectral clustering
         spectral = SpectralClustering(
             n_clusters=self.num_clusters,
@@ -92,40 +92,40 @@ class MultiViewSpectral(BaseClusteringMethod):
             n_init=10
         )
         self.labels_ = spectral.fit_predict(fused_affinity)
-        
+
         # Store fused affinity as embedding
         self.embeddings_ = fused_affinity
-        
+
         return self.labels_
 
 
 class CanonicalCorrelationAnalysis(BaseClusteringMethod):
     """CCA-based multi-view clustering"""
-    
+
     def __init__(self, num_clusters: int, n_components: int = 50):
         super().__init__(num_clusters)
         self.n_components = n_components
         self.embeddings_ = None
-    
-    def fit_predict(self, views: List[np.ndarray], **kwargs) -> np.ndarray:
+
+    def fit_predict(self, views: List[np.ndarray], mask: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
         if len(views) != 2:
             # Fall back to PCA concatenation for more than 2 views
             return self._pca_fallback(views)
-        
+
         from sklearn.cross_decomposition import CCA
-        
+
         n_components = min(self.n_components, views[0].shape[1], views[1].shape[1])
         cca = CCA(n_components=n_components)
         X_c, Y_c = cca.fit_transform(views[0], views[1])
-        
+
         # Average CCA projections
         embeddings = (X_c + Y_c) / 2
-        
+
         # K-Means on CCA embeddings
         kmeans = KMeans(n_clusters=self.num_clusters, n_init=10)
         self.labels_ = kmeans.fit_predict(embeddings)
         self.embeddings_ = embeddings
-        
+
         return self.labels_
     
     def _pca_fallback(self, views: List[np.ndarray]) -> np.ndarray:
@@ -146,14 +146,14 @@ class CanonicalCorrelationAnalysis(BaseClusteringMethod):
 
 class WeightedViewClustering(BaseClusteringMethod):
     """Weighted multi-view clustering with learned view weights"""
-    
+
     def __init__(self, num_clusters: int, n_init: int = 10):
         super().__init__(num_clusters)
         self.n_init = n_init
         self.weights_ = None
         self.embeddings_ = None
-    
-    def fit_predict(self, views: List[np.ndarray], **kwargs) -> np.ndarray:
+
+    def fit_predict(self, views: List[np.ndarray], mask: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
         n_views = len(views)
         
         # Initialize weights uniformly
@@ -283,6 +283,7 @@ class DeepMultiViewClustering(nn.Module, BaseClusteringMethod):
         batch_size: int = 256,
         lr: float = 1e-3,
         device: str = 'cuda',
+        mask: Optional[np.ndarray] = None,
         **kwargs
     ) -> np.ndarray:
         """Train and predict"""
@@ -437,10 +438,11 @@ class ContrastiveMultiViewClustering(nn.Module, BaseClusteringMethod):
         batch_size: int = 256,
         lr: float = 1e-3,
         device: str = 'cuda',
+        mask: Optional[np.ndarray] = None,
         **kwargs
     ) -> np.ndarray:
         self.to(device)
-        
+
         views_t = [torch.FloatTensor(v).to(device) for v in views]
         n_samples = views[0].shape[0]
         indices = np.arange(n_samples)
@@ -538,15 +540,16 @@ class UnalignedMultiViewClustering(BaseClusteringMethod):
     Baseline for unaligned multi-view clustering
     Uses optimal transport to align views before clustering
     """
-    
+
     def __init__(self, num_clusters: int, n_components: int = 50):
         super().__init__(num_clusters)
         self.n_components = n_components
         self.embeddings_ = None
-    
+
     def fit_predict(
         self,
         views: List[np.ndarray],
+        mask: Optional[np.ndarray] = None,
         **kwargs
     ) -> np.ndarray:
         try:
@@ -675,7 +678,7 @@ def run_baseline_comparison(
         labels: Ground truth labels
         num_clusters: Number of clusters
         device: Device for deep methods
-        mask: Optional missing view mask
+        mask: Optional missing view mask [N x V], where 1 = available, 0 = missing
         include_external: Whether to include external methods
         include_internal: Whether to include internal methods
 
@@ -688,28 +691,29 @@ def run_baseline_comparison(
     baselines = get_baseline_methods(view_dims, num_clusters, device,
                                      include_external=include_external,
                                      include_internal=include_internal)
-    
+
     results = {}
-    
+
     for name, method in baselines.items():
         print(f"Running {name}...")
         try:
+            # Pass mask to all methods that support it
             if isinstance(method, nn.Module):
-                predictions = method.fit_predict(views, device=device)
-            elif name == 'Incomplete-MVC' and mask is not None:
-                predictions = method.fit_predict(views, mask=mask)
+                # Deep learning methods - pass mask in kwargs
+                predictions = method.fit_predict(views, device=device, mask=mask)
             else:
-                predictions = method.fit_predict(views)
-            
+                # Traditional methods - pass mask in kwargs
+                predictions = method.fit_predict(views, mask=mask)
+
             embeddings = method.get_embeddings()
             metrics = evaluate_clustering(labels, predictions, embeddings)
             results[name] = metrics
             print(f"  ACC: {metrics['acc']:.4f}, NMI: {metrics['nmi']:.4f}")
-            
+
         except Exception as e:
             print(f"  Error: {e}")
             results[name] = {'error': str(e)}
-    
+
     return results
 
 
