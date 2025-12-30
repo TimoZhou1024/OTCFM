@@ -255,7 +255,17 @@ dataset = MultiViewDataset(
 
 ### Robustness Testing
 
-OT-CFM provides comprehensive robustness testing to evaluate model performance under challenging conditions:
+OT-CFM provides comprehensive robustness testing to evaluate model performance under challenging conditions.
+
+**Note**: 外部方法按专长领域分类，测试时自动筛选相关方法进行公平对比：
+- **Incomplete Test**: 比较 OT-CFM vs Incomplete专用方法 + 通用方法
+- **Unaligned Test**: 比较 OT-CFM vs Unaligned专用方法 + 通用方法
+
+| Category | Methods |
+|----------|---------|
+| Incomplete | COMPLETER, SURE, DealMVC, DCG |
+| Unaligned | MRG-UMC, CANDY |
+| General | MFLVC, GCFAggMVC |
 
 #### Incomplete Data Test (Missing Views)
 Tests how well the model handles missing view data at various missing rates η ∈ {0.1, 0.3, 0.5, 0.7}.
@@ -268,7 +278,7 @@ uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Sc
 uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15 \
     --missing_rates 0.0 0.2 0.4 0.6 0.8
 
-# Include external baselines for comparison
+# Include external baselines for comparison (auto-filters to Incomplete + General methods)
 uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15 \
     --include_external --epochs 100 --num_runs 3
 ```
@@ -283,6 +293,10 @@ uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Sce
 # Custom unaligned rates
 uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Scene15 \
     --unaligned_rates 0.0 0.2 0.4 0.6 0.8
+
+# Include external baselines (auto-filters to Unaligned + General methods)
+uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Scene15 \
+    --include_external --epochs 100 --num_runs 3
 ```
 
 #### Run Both Tests

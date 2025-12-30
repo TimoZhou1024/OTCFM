@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from otcfm.config import ExperimentConfig, ModelConfig, TrainingConfig, DataConfig, get_default_config
 from otcfm.datasets import (
     load_caltech101, load_scene15, load_noisy_mnist,
-    load_bdgp, load_synthetic, load_handwritten, load_coil20,
+    load_bdgp, load_synthetic, load_handwritten, load_coil20, load_nus_wide,
     MultiViewDataset, create_dataloader
 )
 from otcfm.ot_cfm import OTCFM
@@ -52,11 +52,60 @@ DATASET_LOADERS = {
     'synthetic': load_synthetic,
     'handwritten': load_handwritten,
     'coil20': load_coil20,
+    'nus_wide': load_nus_wide,
 }
 
 # Default test rates
 MISSING_RATES = [0.0, 0.1, 0.3, 0.5, 0.7]
 UNALIGNED_RATES = [0.0, 0.2, 0.4, 0.6]
+
+# ============================================================
+# External Method Categories for Robustness Testing
+# ============================================================
+
+# Methods specialized for handling INCOMPLETE data (missing views)
+INCOMPLETE_METHODS = {
+    "COMPLETER (CVPR21)",   # Incomplete Multi-view Clustering via Contrastive Prediction
+    "SURE (TPAMI22)",       # Robust Multi-View Clustering with Incomplete Information
+    "DealMVC (CVPR23)",     # Dual Contrastive Prediction for Incomplete MVC
+    "DCG (AAAI25)",         # Diffusion-based Cross-view Generation for Incomplete MVC
+}
+
+# Methods specialized for handling UNALIGNED data (cross-view correspondence)
+UNALIGNED_METHODS = {
+    "MRG-UMC (TNNLS25)",    # Multi-level Reliable Guidance for Unpaired MVC
+    "CANDY (NeurIPS24)",    # Robust Contrastive MVC against Dual Noisy Correspondence
+}
+
+# General methods (work on standard aligned complete data)
+GENERAL_METHODS = {
+    "MFLVC (CVPR22)",       # Multi-level Feature Learning for Contrastive MVC
+    "GCFAggMVC (CVPR23)",   # Global and Cross-view Feature Aggregation
+}
+
+def filter_methods_by_test_type(method_names: List[str], test_type: str) -> List[str]:
+    """
+    Filter methods based on test type for fair comparison.
+    
+    - incomplete test: include INCOMPLETE_METHODS + GENERAL_METHODS
+    - unaligned test: include UNALIGNED_METHODS + GENERAL_METHODS
+    
+    Args:
+        method_names: List of method names to filter
+        test_type: 'incomplete' or 'unaligned'
+    
+    Returns:
+        Filtered list of method names
+    """
+    if test_type == 'incomplete':
+        allowed = INCOMPLETE_METHODS | GENERAL_METHODS
+    elif test_type == 'unaligned':
+        allowed = UNALIGNED_METHODS | GENERAL_METHODS
+    else:
+        # For other test types, include all methods
+        return method_names
+    
+    return [m for m in method_names if m in allowed]
 
 
 class RobustnessTest:
@@ -296,6 +345,10 @@ class RobustnessTest:
         print(f"Dataset: {self.dataset_name}")
         print(f"Missing rates: {missing_rates}")
         print(f"Runs per setting: {self.num_runs}")
+        if self.include_external:
+            print(f"External methods: INCOMPLETE + GENERAL categories")
+            print(f"  - Incomplete: {', '.join(sorted(INCOMPLETE_METHODS))}")
+            print(f"  - General: {', '.join(sorted(GENERAL_METHODS))}")
         
         all_results = {}
         
@@ -328,8 +381,17 @@ class RobustnessTest:
             if self.include_external or self.include_internal:
                 print("  Running baselines...")
                 baseline_results = self._run_baselines(missing_rate=rate, seed=self.base_seed)
+                
+                # Filter external methods: only include INCOMPLETE + GENERAL methods
                 for name, metrics in baseline_results.items():
                     if 'error' not in metrics:
+                        # Check if it's an external method that should be filtered
+                        is_external = any(tag in name for tag in ['CVPR', 'TPAMI', 'NeurIPS', 'AAAI', 'TNNLS'])
+                        if is_external and name not in INCOMPLETE_METHODS and name not in GENERAL_METHODS:
+                            if self.verbose:
+                                print(f"  [Skip] {name} (not designed for incomplete data)")
+                            continue
+                        
                         rate_results[name] = {
                             'acc': metrics['acc'],
                             'nmi': metrics['nmi'],
@@ -364,6 +426,10 @@ class RobustnessTest:
         print(f"Dataset: {self.dataset_name}")
         print(f"Unaligned rates: {unaligned_rates}")
         print(f"Runs per setting: {self.num_runs}")
+        if self.include_external:
+            print(f"External methods: UNALIGNED + GENERAL categories")
+            print(f"  - Unaligned: {', '.join(sorted(UNALIGNED_METHODS))}")
+            print(f"  - General: {', '.join(sorted(GENERAL_METHODS))}")
         
         all_results = {}
         
@@ -396,8 +462,17 @@ class RobustnessTest:
             if self.include_external or self.include_internal:
                 print("  Running baselines...")
                 baseline_results = self._run_baselines(unaligned_rate=rate, seed=self.base_seed)
+                
+                # Filter external methods: only include UNALIGNED + GENERAL methods
                 for name, metrics in baseline_results.items():
                     if 'error' not in metrics:
+                        # Check if it's an external method that should be filtered
+                        is_external = any(tag in name for tag in ['CVPR', 'TPAMI', 'NeurIPS', 'AAAI', 'TNNLS'])
+                        if is_external and name not in UNALIGNED_METHODS and name not in GENERAL_METHODS:
+                            if self.verbose:
+                                print(f"  [Skip] {name} (not designed for unaligned data)")
+                            continue
+                        
                         rate_results[name] = {
                             'acc': metrics['acc'],
                             'nmi': metrics['nmi'],
