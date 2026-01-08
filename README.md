@@ -104,7 +104,8 @@ OT-CFM/
 │   ├── run_experiment.py         # Main experiment runner
 │   ├── run_optuna_tuning.py      # Optuna hyperparameter tuning
 │   ├── tune_all_datasets.py      # Batch tuning for all datasets
-│   └── run_robustness_test.py    # Robustness testing (incomplete & unaligned data)
+│   ├── run_robustness_test.py    # Robustness testing (incomplete & unaligned data)
+│   └── run_ablation.py           # Comprehensive ablation study
 ├── external_methods/             # External SOTA baselines (clone here)
 │   ├── MFLVC/                    # CVPR 2022
 │   ├── SURE/                     # TPAMI 2022
@@ -417,13 +418,83 @@ Training alternates between:
 
 ## Ablation Study
 
-Run ablation to evaluate component contributions:
+OT-CFM provides comprehensive ablation study tools to evaluate component contributions. Use the dedicated `run_ablation.py` script for systematic experiments.
+
+### Component Ablation
+
+Tests the contribution of each model component by removing it:
 
 ```bash
-uv run python scripts/run_experiment.py --mode ablation --dataset Coil20 --epochs 100
+# Run full component ablation
+uv run python scripts/run_ablation.py --dataset Scene15 --epochs 100
+
+# Run specific ablation modes
+uv run python scripts/run_ablation.py --dataset Handwritten --modes full no_gw no_flow no_cluster
+
+# Quick test with fewer runs
+uv run python scripts/run_ablation.py --dataset Coil20 --epochs 50 --num_runs 2
 ```
 
-Or programmatically:
+**Ablation modes:**
+| Mode | Description |
+|------|-------------|
+| `full` | Complete OT-CFM model (baseline) |
+| `no_gw` | Without Gromov-Wasserstein alignment loss |
+| `no_cluster` | Without clustering loss |
+| `no_ot` | Without optimal transport (random coupling) |
+| `no_flow` | Without flow matching (direct prediction) |
+| `no_contrastive` | Without contrastive loss |
+| `no_recon` | Without reconstruction loss |
+
+### Lambda Sensitivity Analysis
+
+Evaluates how sensitive the model is to different loss weight settings:
+
+```bash
+# Analyze single lambda parameter
+uv run python scripts/run_ablation.py --dataset Scene15 --analysis lambda_sensitivity \
+    --lambda_name lambda_gw
+
+# Custom lambda values
+uv run python scripts/run_ablation.py --dataset Coil20 --analysis lambda_sensitivity \
+    --lambda_name lambda_cluster --lambda_values 0.0 0.1 0.3 0.5 1.0
+```
+
+**Lambda parameters:**
+- `lambda_gw`: Gromov-Wasserstein loss weight
+- `lambda_cluster`: Clustering loss weight
+- `lambda_recon`: Reconstruction loss weight
+- `lambda_contrastive`: Contrastive loss weight
+
+### Architecture Ablation
+
+Tests different architecture configurations:
+
+```bash
+# Run architecture ablation
+uv run python scripts/run_ablation.py --dataset Scene15 --analysis architecture
+```
+
+**Architecture variants tested:**
+- Latent dimensions: 64, 128, 256
+- Encoder depths: shallow, baseline, deep
+- Flow network depths: 2, 4, 8 layers
+
+### Run All Analyses
+
+```bash
+# Run all ablation analyses (component + lambda sensitivity + architecture)
+uv run python scripts/run_ablation.py --dataset Scene15 --analysis all --epochs 50 --num_runs 2
+```
+
+### Output Files
+
+Results are saved to `results/ablation/`:
+- **CSV**: `{dataset}_{analysis_type}_{timestamp}.csv`
+- **JSON**: `{dataset}_{analysis_type}_{timestamp}.json`
+- **PNG**: Visualization plots for each analysis type
+
+### Programmatic Usage
 
 ```python
 from otcfm.ablation import AblationStudy, AblationConfig
@@ -436,14 +507,6 @@ ablation_config = AblationConfig(
 study = AblationStudy(config, ablation_config)
 results = study.run(train_loader, labels, view_dims)
 ```
-
-Available ablation modes:
-- `full`: Complete model
-- `no_gw`: Without Gromov-Wasserstein loss
-- `no_cluster`: Without clustering loss
-- `no_ot`: Without optimal transport
-- `no_flow`: Without flow matching
-- `no_contrastive`: Without contrastive loss
 
 ## Internal Baseline Methods
 

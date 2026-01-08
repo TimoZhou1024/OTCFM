@@ -407,6 +407,9 @@ class Trainer:
     
     def _save_checkpoint(self, filename: str):
         """Save model checkpoint"""
+        # Ensure experiment directory exists before saving
+        self.experiment_dir.mkdir(parents=True, exist_ok=True)
+        
         checkpoint = {
             'epoch': self.epoch,
             'model_state_dict': self.model.state_dict(),
