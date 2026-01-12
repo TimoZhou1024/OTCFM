@@ -122,9 +122,7 @@ class RobustnessTest:
         include_external: bool = False,
         include_internal: bool = True,
         verbose: bool = True,
-        seed: int = 42,
-        use_tuned: bool = False,
-        tuned_key: str = None
+        seed: int = 42
     ):
         """
         Initialize robustness test
@@ -140,8 +138,6 @@ class RobustnessTest:
             include_internal: Include internal baseline methods
             verbose: Print detailed output
             seed: Base random seed
-            use_tuned: Use Optuna-tuned hyperparameters
-            tuned_key: Specific key for tuned params (e.g., 'scene15_robust_incomplete')
         """
         self.dataset_name = dataset_name
         self.data_root = data_root
@@ -152,13 +148,6 @@ class RobustnessTest:
         self.include_internal = include_internal
         self.verbose = verbose
         self.base_seed = seed
-        self.use_tuned = use_tuned
-        self.tuned_key = tuned_key
-        self.tuned_params = None
-        
-        # Load tuned parameters if requested
-        if use_tuned:
-            self._load_tuned_params()
         
         # Auto-detect device
         if device is None:
@@ -173,23 +162,6 @@ class RobustnessTest:
         
         # Load dataset
         self._load_data()
-    
-    def _load_tuned_params(self):
-        """Load tuned hyperparameters from config"""
-        try:
-            from run_optuna_tuning import load_tuned_params
-            self.tuned_params = load_tuned_params(
-                self.dataset_name, 
-                config_dir="config",
-                tuned_key=self.tuned_key
-            )
-            if self.tuned_params:
-                print(f"Loaded tuned parameters: {self.tuned_key or self.dataset_name.lower()}")
-            else:
-                print("Warning: Could not load tuned parameters, using defaults")
-        except ImportError:
-            print("Warning: Could not import tuning module, using default parameters")
-            self.tuned_params = None
     
     def _load_data(self):
         """Load the dataset"""
@@ -255,46 +227,24 @@ class RobustnessTest:
         
         train_loader = create_dataloader(dataset, self.batch_size, shuffle=True)
         
-        # Get model parameters (use tuned if available)
-        if self.tuned_params:
-            model_params = {
-                'latent_dim': self.tuned_params.get('latent_dim', 128),
-                'hidden_dims': eval(self.tuned_params['hidden_dims']) if isinstance(self.tuned_params.get('hidden_dims'), str) else self.tuned_params.get('hidden_dims', [512, 256]),
-                'flow_hidden_dim': self.tuned_params.get('flow_hidden_dim', 256),
-                'flow_num_layers': self.tuned_params.get('flow_num_layers', 4),
-                'time_dim': self.tuned_params.get('time_dim', 64),
-                'ode_steps': self.tuned_params.get('ode_steps', 10),
-                'kernel_type': self.tuned_params.get('kernel_type', 'rbf'),
-                'kernel_gamma': self.tuned_params.get('kernel_gamma', 1.0),
-                'lambda_gw': self.tuned_params.get('lambda_gw', 0.1),
-                'lambda_cluster': self.tuned_params.get('lambda_cluster', 0.5),
-                'lambda_recon': self.tuned_params.get('lambda_recon', 1.0),
-                'lambda_contrastive': self.tuned_params.get('lambda_contrastive', 0.1),
-                'dropout': self.tuned_params.get('dropout', 0.1),
-            }
-        else:
-            model_params = {
-                'latent_dim': 128,
-                'hidden_dims': [512, 256],
-                'flow_hidden_dim': 256,
-                'flow_num_layers': 4,
-                'time_dim': 64,
-                'ode_steps': 10,
-                'kernel_type': 'rbf',
-                'kernel_gamma': 1.0,
-                'lambda_gw': 0.1,
-                'lambda_cluster': 0.5,
-                'lambda_recon': 1.0,
-                'lambda_contrastive': 0.1,
-                'dropout': 0.1,
-            }
-        
         # Create model
         model = OTCFM(
             view_dims=self.view_dims,
+            latent_dim=128,
+            hidden_dims=[512, 256],
             num_clusters=self.num_clusters,
+            flow_hidden_dim=256,
+            flow_num_layers=4,
+            time_dim=64,
+            ode_steps=10,
             sigma_min=1e-4,
-            **model_params
+            kernel_type="rbf",
+            kernel_gamma=1.0,
+            lambda_gw=0.1,
+            lambda_cluster=0.5,
+            lambda_recon=1.0,
+            lambda_contrastive=0.1,
+            dropout=0.1
         )
         
         # Create trainer (with quiet mode if not verbose)
@@ -302,16 +252,6 @@ class RobustnessTest:
         os.makedirs(exp_dir, exist_ok=True)
         
         config = self._create_config(missing_rate, unaligned_rate)
-        
-        # Apply tuned training params if available
-        if self.tuned_params:
-            if 'learning_rate' in self.tuned_params:
-                config.training.learning_rate = self.tuned_params['learning_rate']
-            if 'weight_decay' in self.tuned_params:
-                config.training.weight_decay = self.tuned_params['weight_decay']
-            if 'batch_size' in self.tuned_params:
-                config.training.batch_size = self.tuned_params['batch_size']
-        
         trainer = Trainer(
             model=model,
             config=config.training,
@@ -735,22 +675,7 @@ def plot_combined_results(
         (axes[1, 0], unaligned_results, 'ACC', 'Unaligned Rate (p)', 'Unaligned Data'),
         (axes[1, 1], unaligned_results, 'NMI', 'Unaligned Rate (p)', 'Unaligned Data'),
     ]
-
-    def _compute_ylim(values: List[float]) -> Tuple[float, float]:
-        if not values:
-            return (0.0, 1.0)
-        vmin = float(np.min(values))
-        vmax = float(np.max(values))
-        span = max(vmax - vmin, 1e-6)
-        margin = max(0.1 * span, 0.02)
-        lower = max(0.0, vmin - margin)
-        upper = min(1.0, vmax + margin)
-        if upper - lower < 0.1:
-            center = (vmin + vmax) / 2
-            lower = max(0.0, center - 0.05)
-            upper = min(1.0, center + 0.05)
-        return (lower, upper)
-
+    
     for ax, results, metric, x_label, title_prefix in plot_configs:
         if results is None:
             ax.set_visible(False)
@@ -793,19 +718,7 @@ def plot_combined_results(
         ax.set_title(f'{title_prefix} - {metric}', fontsize=12)
         ax.legend(loc='best', fontsize=8)
         ax.grid(True, alpha=0.3)
-        # Dynamic y-limits based on visible results for this subplot
-        all_vals = []
-        if results:
-            for rate_results in results.values():
-                for method_results in rate_results.values():
-                    val = method_results.get(metric.lower())
-                    if val is not None:
-                        try:
-                            all_vals.append(float(val))
-                        except Exception:
-                            pass
-        y_lower, y_upper = _compute_ylim(all_vals)
-        ax.set_ylim(y_lower, y_upper)
+        ax.set_ylim(0, 1.0)
         ax.set_xticks(rates)
         ax.set_xticklabels([f'{r:.0%}' for r in rates])
     
@@ -864,10 +777,6 @@ def main():
                         default=None, help='Custom missing rates')
     parser.add_argument('--unaligned_rates', type=float, nargs='+',
                         default=None, help='Custom unaligned rates')
-    parser.add_argument('--use_tuned', action='store_true',
-                        help='Use Optuna-tuned hyperparameters for OT-CFM')
-    parser.add_argument('--tuned_key', type=str, default=None,
-                        help='Specific key for tuned params (e.g., scene15_robust_incomplete)')
     
     args = parser.parse_args()
     
@@ -886,9 +795,7 @@ def main():
         include_external=args.include_external,
         include_internal=not args.no_internal,
         verbose=args.verbose,
-        seed=args.seed,
-        use_tuned=args.use_tuned,
-        tuned_key=args.tuned_key
+        seed=args.seed
     )
     
     incomplete_results = None
