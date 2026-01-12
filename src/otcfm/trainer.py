@@ -371,9 +371,13 @@ class Trainer:
         kmeans = KMeans(n_clusters=self.model.num_clusters, n_init=10)
         kmeans.fit(embeddings_np)
         
-        self.model.clustering.centroids.data = torch.FloatTensor(
-            kmeans.cluster_centers_
-        ).to(self.device)
+        # Create tensor on the correct device
+        new_centroids = torch.tensor(
+            kmeans.cluster_centers_,
+            dtype=torch.float32,
+            device=self.device
+        )
+        self.model.clustering.centroids.data = new_centroids
     
     @torch.no_grad()
     def _evaluate(self, dataloader: DataLoader, labels: np.ndarray) -> Dict:

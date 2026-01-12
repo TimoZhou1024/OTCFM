@@ -425,7 +425,7 @@ class OTCFM(nn.Module):
         all_embeddings = all_embeddings[order]
         
         self.clustering.init_centroids(all_embeddings)
-        self.clustering.centroids = self.clustering.centroids.to(device)
+        self.clustering.centroids.data = self.clustering.centroids.data.to(device)
 
 
 class OTCFMTrainer:
@@ -518,9 +518,13 @@ class OTCFMTrainer:
         kmeans = KMeans(n_clusters=self.model.num_clusters, n_init=10)
         kmeans.fit(embeddings_np)
         
-        self.model.clustering.centroids.data = torch.FloatTensor(
-            kmeans.cluster_centers_
-        ).to(self.device)
+        # Create tensor on the correct device
+        new_centroids = torch.tensor(
+            kmeans.cluster_centers_,
+            dtype=torch.float32,
+            device=self.device
+        )
+        self.model.clustering.centroids.data = new_centroids
     
     @torch.no_grad()
     def evaluate(self, dataloader, labels: np.ndarray) -> Dict:

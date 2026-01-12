@@ -403,7 +403,13 @@ class ClusteringModule(nn.Module):
         centers = kmeans.cluster_centers_
         centers = centers / (np.linalg.norm(centers, axis=1, keepdims=True) + 1e-8)
         
-        self.centroids.data = torch.FloatTensor(centers).to(z.device)
+        # Create tensor on the correct device
+        new_centroids = torch.tensor(
+            centers,
+            dtype=torch.float32,
+            device=z.device
+        )
+        self.centroids.data = new_centroids
     
     def get_assignments(self, z: torch.Tensor) -> torch.Tensor:
         """Get hard cluster assignments"""
