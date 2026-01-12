@@ -38,7 +38,7 @@ class Trainer:
         self.config = config
         self.device = device
         self.verbose = verbose
-        self.experiment_dir = Path(experiment_dir)
+        self.experiment_dir = Path(experiment_dir).resolve()
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
         
         # Setup optimizer
@@ -420,7 +420,7 @@ class Trainer:
         if self.scheduler is not None:
             checkpoint['scheduler_state_dict'] = self.scheduler.state_dict()
         
-        torch.save(checkpoint, self.experiment_dir / filename)
+        torch.save(checkpoint, str(self.experiment_dir / filename))
     
     def load_checkpoint(self, filename: str):
         """Load model checkpoint"""
