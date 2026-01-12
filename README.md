@@ -204,6 +204,37 @@ uv run python scripts/run_experiment.py --dataset Handwritten --use_tuned
 uv run python scripts/run_experiment.py --mode compare --dataset Handwritten --use_tuned --include_external
 ```
 
+#### Robustness-Aware Tuning
+
+For better performance in robustness tests (incomplete/unaligned data), use **robustness-aware tuning**. This optimizes hyperparameters across multiple challenging conditions simultaneously, producing parameters that work well under various missing rates and unaligned rates.
+
+```bash
+# Tune for incomplete data robustness (missing views)
+uv run python scripts/run_optuna_tuning.py --dataset Scene15 --n_trials 100 --robustness incomplete
+
+# Tune for unaligned data robustness (shuffled samples)
+uv run python scripts/run_optuna_tuning.py --dataset Scene15 --n_trials 100 --robustness unaligned
+
+# Tune for both conditions (recommended for comprehensive robustness)
+uv run python scripts/run_optuna_tuning.py --dataset Scene15 --n_trials 100 --robustness both
+
+# Use robustness-tuned parameters in robustness testing
+uv run python scripts/run_robustness_test.py --dataset Scene15 --test_type incomplete \
+    --use_tuned --tuned_key scene15_robust_incomplete
+
+# Full robustness test with tuned parameters
+uv run python scripts/run_robustness_test.py --dataset Scene15 --test_type both \
+    --use_tuned --tuned_key scene15_robust_both --include_external
+```
+
+**Robustness tuning modes:**
+| Mode | Description | Optimizes For |
+|------|-------------|---------------|
+| `none` | Standard tuning on complete data | Baseline performance |
+| `incomplete` | Tuning across missing rates [0%, 10%, 30%, 50%] | Missing view handling |
+| `unaligned` | Tuning across unaligned rates [0%, 20%, 40%] | Sample alignment |
+| `both` | Combined conditions including stress tests | Overall robustness |
+
 Tuned parameters are saved to `config/tuned_params.json` and can be reused across experiments.
 
 **Tuned hyperparameters include:**
@@ -313,6 +344,20 @@ uv run python scripts/run_robustness_test.py --test_type both \
     --num_runs 3 \
     --include_external \
     --save_dir results/robustness
+```
+
+#### Using Tuned Parameters for Better Robustness
+
+For optimal robustness test results, first run robustness-aware tuning, then use those parameters:
+
+```bash
+# Step 1: Tune for robustness (run once, takes time)
+uv run python scripts/run_optuna_tuning.py --dataset Scene15 --n_trials 100 --robustness both
+
+# Step 2: Run robustness test with tuned parameters
+uv run python scripts/run_robustness_test.py --test_type both --dataset Scene15 \
+    --use_tuned --tuned_key scene15_robust_both \
+    --include_external --epochs 100 --num_runs 3
 ```
 
 #### Output Files
