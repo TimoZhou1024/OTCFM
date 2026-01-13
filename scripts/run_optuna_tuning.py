@@ -38,6 +38,11 @@ from otcfm.trainer import Trainer
 from otcfm.metrics import evaluate_clustering
 
 
+# Robustness tuning settings
+ROBUSTNESS_MISSING_RATES = [0.0, 0.1, 0.3, 0.5]
+ROBUSTNESS_UNALIGNED_RATES = [0.0, 0.2, 0.4]
+
+
 # Dataset loader mapping
 DATASET_LOADERS = {
     'caltech101': load_caltech101,
@@ -69,6 +74,7 @@ class OptunaHyperparameterTuner:
         seed: int = 42,
         tuning_epochs: int = 50,
         save_dir: str = "config",
+        robustness_mode: str = "none",  # "none", "incomplete", "unaligned", "both"
     ):
         """
         Initialize the tuner
@@ -85,6 +91,11 @@ class OptunaHyperparameterTuner:
             seed: Random seed
             tuning_epochs: Number of epochs for each trial (less than full training)
             save_dir: Directory to save tuned parameters
+            robustness_mode: Robustness tuning mode
+                - "none": Standard tuning on complete data
+                - "incomplete": Tune for missing view robustness
+                - "unaligned": Tune for unaligned data robustness
+                - "both": Tune for both incomplete and unaligned robustness
         """
         self.dataset_name = dataset_name.lower()
         self.data_root = data_root
@@ -97,6 +108,11 @@ class OptunaHyperparameterTuner:
         self.seed = seed
         self.tuning_epochs = tuning_epochs
         self.save_dir = Path(save_dir)
+        self.robustness_mode = robustness_mode
+        
+        # Adjust study name for robustness mode
+        if robustness_mode != "none":
+            self.study_name = f"otcfm_{self.dataset_name}_robust_{robustness_mode}"
         
         # Load dataset once
         self._load_dataset()
@@ -165,13 +181,23 @@ class OptunaHyperparameterTuner:
         
         return params
     
-    def _create_model_and_train(self, params: Dict[str, Any]) -> float:
+    def _create_model_and_train(
+        self, 
+        params: Dict[str, Any],
+        missing_rate: float = 0.0,
+        unaligned_rate: float = 0.0
+    ) -> float:
         """Create model with given params and train, return best ACC"""
         # Parse hidden_dims string
         hidden_dims = eval(params["hidden_dims"])
         
-        # Create dataset
-        dataset = MultiViewDataset(views=self.views, labels=self.labels)
+        # Create dataset with missing/unaligned settings
+        dataset = MultiViewDataset(
+            views=self.views, 
+            labels=self.labels,
+            missing_rate=missing_rate,
+            unaligned_rate=unaligned_rate
+        )
         train_loader = create_dataloader(dataset, params["batch_size"], shuffle=True)
         
         # Create model
@@ -227,11 +253,74 @@ class OptunaHyperparameterTuner:
         
         try:
             params = self._suggest_hyperparameters(trial)
-            acc = self._create_model_and_train(params)
-            return acc
+            
+            if self.robustness_mode == "none":
+                # Standard tuning on complete data
+                acc = self._create_model_and_train(params)
+                return acc
+            else:
+                # Robustness tuning: evaluate on multiple conditions
+                return self._robustness_objective(params, trial)
+                
         except Exception as e:
             print(f"Trial {trial.number} failed: {e}")
             return 0.0  # Return worst score on failure
+    
+    def _robustness_objective(self, params: Dict[str, Any], trial: Trial) -> float:
+        """
+        Robustness-aware objective: optimize average ACC across multiple conditions.
+        This produces parameters that work well across various missing/unaligned rates.
+        """
+        all_accs = []
+        
+        # Determine which conditions to test based on robustness mode
+        if self.robustness_mode == "incomplete":
+            # Test across different missing rates
+            conditions = [(mr, 0.0) for mr in ROBUSTNESS_MISSING_RATES]
+        elif self.robustness_mode == "unaligned":
+            # Test across different unaligned rates
+            conditions = [(0.0, ur) for ur in ROBUSTNESS_UNALIGNED_RATES]
+        else:  # "both"
+            # Test a representative subset of both conditions
+            conditions = [
+                (0.0, 0.0),    # Complete & aligned
+                (0.3, 0.0),   # Moderate missing
+                (0.5, 0.0),   # High missing
+                (0.0, 0.2),   # Moderate unaligned
+                (0.0, 0.4),   # High unaligned
+                (0.3, 0.2),   # Combined stress
+            ]
+        
+        # Evaluate on each condition
+        for missing_rate, unaligned_rate in conditions:
+            try:
+                acc = self._create_model_and_train(
+                    params, 
+                    missing_rate=missing_rate, 
+                    unaligned_rate=unaligned_rate
+                )
+                all_accs.append(acc)
+                
+                # Report intermediate value for pruning
+                trial.report(np.mean(all_accs), len(all_accs) - 1)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+                    
+            except optuna.TrialPruned:
+                raise
+            except Exception as e:
+                print(f"  Condition (missing={missing_rate}, unaligned={unaligned_rate}) failed: {e}")
+                all_accs.append(0.0)
+        
+        # Return weighted average (emphasize harder conditions slightly)
+        if len(all_accs) == 0:
+            return 0.0
+        
+        # Weight harder conditions more to encourage robustness
+        weights = np.linspace(1.0, 1.5, len(all_accs))
+        weighted_acc = np.average(all_accs, weights=weights)
+        
+        return weighted_acc
     
     def run(self) -> Dict[str, Any]:
         """Run the hyperparameter tuning"""
@@ -241,6 +330,14 @@ class OptunaHyperparameterTuner:
         print(f"Trials: {self.n_trials}")
         print(f"Epochs per trial: {self.tuning_epochs}")
         print(f"Device: {self.device}")
+        print(f"Robustness mode: {self.robustness_mode}")
+        if self.robustness_mode != "none":
+            if self.robustness_mode == "incomplete":
+                print(f"  Missing rates: {ROBUSTNESS_MISSING_RATES}")
+            elif self.robustness_mode == "unaligned":
+                print(f"  Unaligned rates: {ROBUSTNESS_UNALIGNED_RATES}")
+            else:
+                print(f"  Testing combined incomplete + unaligned conditions")
         print(f"{'='*60}\n")
         
         # Create sampler and pruner
@@ -302,11 +399,18 @@ class OptunaHyperparameterTuner:
             all_params = {}
         
         # Update with this dataset's params
-        all_params[self.dataset_name] = {
+        # Use different keys for robustness-tuned params
+        if self.robustness_mode != "none":
+            param_key = f"{self.dataset_name}_robust_{self.robustness_mode}"
+        else:
+            param_key = self.dataset_name
+            
+        all_params[param_key] = {
             "params": best_params,
             "best_acc": best_value,
             "tuned_at": datetime.now().isoformat(),
             "n_trials": len(study.trials),
+            "robustness_mode": self.robustness_mode,
         }
         
         with open(tuned_params_path, 'w') as f:
@@ -337,13 +441,19 @@ class OptunaHyperparameterTuner:
         print(f"Full study saved to: {study_path}")
 
 
-def load_tuned_params(dataset_name: str, config_dir: str = "config") -> Optional[Dict[str, Any]]:
+def load_tuned_params(
+    dataset_name: str, 
+    config_dir: str = "config",
+    tuned_key: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """
     Load tuned parameters for a dataset
     
     Args:
         dataset_name: Name of the dataset
         config_dir: Directory containing tuned_params.json
+        tuned_key: Optional specific key to load (e.g., 'scene15_robust_incomplete')
+                   If None, uses dataset_name.lower()
     
     Returns:
         Dictionary of tuned parameters or None if not found
@@ -357,13 +467,15 @@ def load_tuned_params(dataset_name: str, config_dir: str = "config") -> Optional
     with open(tuned_params_path, 'r') as f:
         all_params = json.load(f)
     
-    dataset_key = dataset_name.lower()
-    if dataset_key not in all_params:
-        print(f"No tuned parameters for dataset: {dataset_name}")
-        print(f"Available datasets: {list(all_params.keys())}")
+    # Use provided key or default to dataset name
+    param_key = tuned_key if tuned_key else dataset_name.lower()
+    
+    if param_key not in all_params:
+        print(f"No tuned parameters for key: {param_key}")
+        print(f"Available keys: {list(all_params.keys())}")
         return None
     
-    return all_params[dataset_key]["params"]
+    return all_params[param_key]["params"]
 
 
 def apply_tuned_params(config: ExperimentConfig, tuned_params: Dict[str, Any]) -> ExperimentConfig:
@@ -443,6 +555,10 @@ def main():
                         help='Directory to save tuned parameters')
     parser.add_argument('--storage', type=str, default=None,
                         help='Optuna storage URL (e.g., sqlite:///optuna.db)')
+    parser.add_argument('--robustness', type=str, default='none',
+                        choices=['none', 'incomplete', 'unaligned', 'both'],
+                        help='Robustness tuning mode: none (standard), incomplete (missing views), '
+                             'unaligned (shuffled samples), or both')
     
     args = parser.parse_args()
     
@@ -472,6 +588,7 @@ def main():
         tuning_epochs=args.tuning_epochs,
         save_dir=args.save_dir,
         storage=args.storage,
+        robustness_mode=args.robustness,
     )
     
     results = tuner.run()
@@ -480,10 +597,20 @@ def main():
     print("Tuning Summary")
     print(f"{'='*60}")
     print(f"Dataset: {args.dataset}")
+    print(f"Robustness mode: {args.robustness}")
     print(f"Best ACC: {results['best_value']:.4f}")
     print(f"Total trials: {results['n_trials']}")
-    print(f"\nTo use tuned parameters:")
-    print(f"  uv run python scripts/run_experiment.py --dataset {args.dataset} --use_tuned")
+    
+    # Show usage hint based on robustness mode
+    if args.robustness != "none":
+        param_key = f"{args.dataset.lower()}_robust_{args.robustness}"
+        print(f"\nTo use robustness-tuned parameters in experiments:")
+        print(f"  uv run python scripts/run_experiment.py --dataset {args.dataset} --use_tuned --tuned_key {param_key}")
+        print(f"\nFor robustness testing with tuned params:")
+        print(f"  uv run python scripts/run_robustness_test.py --dataset {args.dataset} --use_tuned --tuned_key {param_key}")
+    else:
+        print(f"\nTo use tuned parameters:")
+        print(f"  uv run python scripts/run_experiment.py --dataset {args.dataset} --use_tuned")
 
 
 if __name__ == "__main__":
