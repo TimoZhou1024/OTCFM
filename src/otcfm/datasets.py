@@ -271,17 +271,51 @@ def load_bdgp(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
 
 
 def load_cub(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
-    """Load CUB (Caltech-UCSD Birds) dataset"""
+    """Load CUB (Caltech-UCSD Birds) dataset
+    
+    The CUB.mat file contains train/test splits:
+    - x1_train, x1_test: View 1 features (1024-dim)
+    - x2_train, x2_test: View 2 features (300-dim)
+    - gt_train, gt_test: Ground truth labels
+    """
     path = os.path.join(data_dir, "CUB.mat")
     if not os.path.exists(path):
         raise FileNotFoundError(f"Please download CUB.mat to {data_dir}")
     
     data = sio.loadmat(path)
-    views = []
-    for key in ['X1', 'X2', 'X3']:
-        if key in data:
-            views.append(np.array(data[key], dtype=np.float32))
-    labels = np.array(data['Y']).flatten() - 1
+    
+    # Check data format - some CUB.mat files have train/test splits
+    if 'x1_train' in data and 'x1_test' in data:
+        # Combine train and test data
+        views = []
+        for i in [1, 2]:
+            train_key = f'x{i}_train'
+            test_key = f'x{i}_test'
+            if train_key in data and test_key in data:
+                view_data = np.vstack([
+                    np.array(data[train_key], dtype=np.float32),
+                    np.array(data[test_key], dtype=np.float32)
+                ])
+                views.append(view_data)
+        
+        # Combine labels
+        labels = np.vstack([
+            np.array(data['gt_train']),
+            np.array(data['gt_test'])
+        ]).flatten()
+        # Convert to 0-indexed if labels start from 1
+        if labels.min() >= 1:
+            labels = labels - 1
+    else:
+        # Standard format with X1, X2, X3 and Y
+        views = []
+        for key in ['X1', 'X2', 'X3']:
+            if key in data:
+                views.append(np.array(data[key], dtype=np.float32))
+        labels = np.array(data['Y']).flatten()
+        if labels.min() >= 1:
+            labels = labels - 1
+    
     return views, labels
 
 
