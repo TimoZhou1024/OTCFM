@@ -287,11 +287,11 @@ dataset = MultiViewDataset(
 
 ### Robustness Testing
 
-OT-CFM provides comprehensive robustness testing to evaluate model performance under challenging conditions.
+OT-CFM provides comprehensive robustness testing to evaluate model performance under challenging conditions. **By default, robustness tests compare OT-CFM against external SOTA methods only.**
 
-**Note**: 外部方法按专长领域分类，测试时自动筛选相关方法进行公平对比：
-- **Incomplete Test**: 比较 OT-CFM vs Incomplete专用方法 + 通用方法
-- **Unaligned Test**: 比较 OT-CFM vs Unaligned专用方法 + 通用方法
+外部方法按专长领域分类，测试时自动筛选相关方法进行公平对比：
+- **Incomplete Test**: OT-CFM vs Incomplete专用方法 + 通用方法
+- **Unaligned Test**: OT-CFM vs Unaligned专用方法 + 通用方法
 
 | Category | Methods |
 |----------|---------|
@@ -303,47 +303,49 @@ OT-CFM provides comprehensive robustness testing to evaluate model performance u
 Tests how well the model handles missing view data at various missing rates η ∈ {0.1, 0.3, 0.5, 0.7}.
 
 ```bash
-# Run incomplete data test
+# Run incomplete data test (compares with external methods by default)
 uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15
 
 # Custom missing rates
 uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15 \
     --missing_rates 0.0 0.2 0.4 0.6 0.8
 
-# Include external baselines for comparison (auto-filters to Incomplete + General methods)
+# Also include internal baselines
 uv run python scripts/run_robustness_test.py --test_type incomplete --dataset Scene15 \
-    --include_external --epochs 100 --num_runs 3
+    --include_internal --epochs 100 --num_runs 3
 ```
 
 #### Unaligned Data Test (Shuffled Samples)  
 Tests the model's ability to handle sample misalignment across views at shuffle rates p ∈ {0%, 20%, 40%, 60%}.
 
 ```bash
-# Run unaligned data test
+# Run unaligned data test (compares with external methods by default)
 uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Scene15
 
 # Custom unaligned rates
 uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Scene15 \
     --unaligned_rates 0.0 0.2 0.4 0.6 0.8
 
-# Include external baselines (auto-filters to Unaligned + General methods)
+# Also include internal baselines
 uv run python scripts/run_robustness_test.py --test_type unaligned --dataset Scene15 \
-    --include_external --epochs 100 --num_runs 3
+    --include_internal --epochs 100 --num_runs 3
 ```
 
 #### Run Both Tests
 ```bash
-# Run both incomplete and unaligned tests
+# Run both incomplete and unaligned tests (external methods by default)
 uv run python scripts/run_robustness_test.py --test_type both --dataset Scene15 \
-    --include_external --epochs 100 --num_runs 3
+    --epochs 100 --num_runs 3
 
 # Full robustness test command
 uv run python scripts/run_robustness_test.py --test_type both \
     --dataset Scene15 \
     --epochs 100 \
     --num_runs 3 \
-    --include_external \
     --save_dir results/robustness
+
+# Disable external methods (OT-CFM only)
+uv run python scripts/run_robustness_test.py --test_type both --dataset Scene15 --no_external
 ```
 
 #### Using Tuned Parameters for Better Robustness
@@ -356,8 +358,7 @@ uv run python scripts/run_optuna_tuning.py --dataset Scene15 --n_trials 100 --ro
 
 # Step 2: Run robustness test with tuned parameters
 uv run python scripts/run_robustness_test.py --test_type both --dataset Scene15 \
-    --use_tuned --tuned_key scene15_robust_both \
-    --include_external --epochs 100 --num_runs 3
+    --use_tuned --tuned_key scene15_robust_both --epochs 100 --num_runs 3
 ```
 
 #### Output Files

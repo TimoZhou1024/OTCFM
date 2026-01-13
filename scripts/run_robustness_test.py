@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from otcfm.config import ExperimentConfig, ModelConfig, TrainingConfig, DataConfig, get_default_config
 from otcfm.datasets import (
     load_caltech101, load_scene15, load_noisy_mnist,
-    load_bdgp, load_synthetic, load_handwritten, load_coil20, load_nus_wide,
+    load_bdgp, load_synthetic, load_handwritten, load_coil20, load_nus_wide, load_cub,
     MultiViewDataset, create_dataloader
 )
 from otcfm.ot_cfm import OTCFM
@@ -53,6 +53,7 @@ DATASET_LOADERS = {
     'handwritten': load_handwritten,
     'coil20': load_coil20,
     'nus_wide': load_nus_wide,
+    'cub': load_cub,
 }
 
 # Default test rates
@@ -848,10 +849,10 @@ def main():
                         help='Number of runs per setting')
     parser.add_argument('--device', type=str, default=None,
                         help='Device (auto-detect if not specified)')
-    parser.add_argument('--include_external', action='store_true',
-                        help='Include external baseline methods')
-    parser.add_argument('--no_internal', action='store_true',
-                        help='Exclude internal baseline methods')
+    parser.add_argument('--include_internal', action='store_true',
+                        help='Include internal baseline methods (disabled by default)')
+    parser.add_argument('--no_external', action='store_true',
+                        help='Exclude external baseline methods')
     parser.add_argument('--save_dir', type=str, default='results/robustness',
                         help='Directory to save results')
     parser.add_argument('--seed', type=int, default=42,
@@ -883,8 +884,8 @@ def main():
         batch_size=args.batch_size,
         device=args.device,
         num_runs=args.num_runs,
-        include_external=args.include_external,
-        include_internal=not args.no_internal,
+        include_external=not args.no_external,
+        include_internal=args.include_internal,
         verbose=args.verbose,
         seed=args.seed,
         use_tuned=args.use_tuned,
