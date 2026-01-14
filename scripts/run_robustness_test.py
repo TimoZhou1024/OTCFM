@@ -82,6 +82,10 @@ UNALIGNED_METHODS = {
 GENERAL_METHODS = {
     "MFLVC (CVPR22)",       # Multi-level Feature Learning for Contrastive MVC
     "GCFAggMVC (CVPR23)",   # Global and Cross-view Feature Aggregation
+    "MGCCFF (AAAI25)",      # Multi-Granularity Cross-view Clustering with Feature Fusion
+    "FreeCSL (CVPR25)",     # Free-anchor Contrastive Self-supervised Learning
+    "ROLL (CVPR25)",        # Robust Noisy Pseudo-label Learning
+    "PROTOCOL (ICML25)",    # Progressive Optimal Transport for Imbalanced MVC
 }
 
 def filter_methods_by_test_type(method_names: List[str], test_type: str) -> List[str]:

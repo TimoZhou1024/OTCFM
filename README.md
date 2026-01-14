@@ -401,6 +401,10 @@ OT-CFM integrates several SOTA multi-view clustering methods for comparison:
 | **CANDY** | NeurIPS 2024 | Robust Contrastive MVC against Dual Noisy Correspondence |
 | **DCG** | AAAI 2025 | Diffusion-based Incomplete MVC |
 | **MRG-UMC** | TNNLS 2025 | Multi-level Reliable Guidance for Unpaired MVC |
+| **MGCCFF** | AAAI 2025 | Multi-Granularity Cross-view Clustering with Feature Fusion |
+| **FreeCSL** | CVPR 2025 | Free-anchor Contrastive Self-supervised Learning for MVC |
+| **ROLL** | CVPR 2025 | Robust Noisy Pseudo-label Learning for MVC |
+| **PROTOCOL** | ICML 2025 | Progressive Optimal Transport for Imbalanced MVC |
 
 To use external methods, clone them to `external_methods/`:
 
@@ -427,6 +431,18 @@ git clone https://github.com/LikeXin94/MRG-UMC.git MRG-UMC
 
 # CANDY (NeurIPS 2024)
 git clone https://github.com/XLearning-SCU/2024-NeurIPS-CANDY.git 2024-NeurIPS-CANDY
+
+# MGCCFF (AAAI 2025)
+git clone https://github.com/AlanWang2000/MGCCFF.git MGCCFF
+
+# FreeCSL (CVPR 2025)
+git clone https://github.com/zoyadai/2025_CVPR_FreeCSL.git 2025_CVPR_FreeCSL
+
+# ROLL (CVPR 2025)
+git clone https://github.com/sunyuan-cs/2025-CVPR-ROLL.git 2025-CVPR-ROLL
+
+# PROTOCOL (ICML 2025)
+git clone https://github.com/Scarlett125/PROTOCOL.git PROTOCOL
 ```
 
 Then run comparison:

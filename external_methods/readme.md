@@ -26,6 +26,10 @@
 |--------|-------|-------|------|
 | **MFLVC** | CVPR 2022 | Multi-level Feature Learning for Contrastive MVC | 多层特征对比学习 |
 | **GCFAggMVC** | CVPR 2023 | Global and Cross-view Feature Aggregation | 全局与跨视图特征聚合 |
+| **MGCCFF** | AAAI 2025 | Multi-Granularity Cross-view Clustering with Feature Fusion | 多粒度跨视图特征融合 |
+| **FreeCSL** | CVPR 2025 | Free-anchor Contrastive Self-supervised Learning for MVC | 无锚点对比自监督学习 |
+| **ROLL** | CVPR 2025 | Robust Noisy Pseudo-label Learning for MVC | 鲁棒噪声伪标签学习 |
+| **PROTOCOL** | ICML 2025 | Progressive Optimal Transport for Imbalanced MVC | 渐进式最优传输处理不平衡聚类 |
 
 ## 克隆方法
 
@@ -58,6 +62,18 @@ git clone https://github.com/XLearning-SCU/2022-CVPR-MFLVC.git MFLVC
 
 # GCFAggMVC (CVPR 2023)
 git clone https://github.com/Galaxy922/GCFAggMVC.git GCFAggMVC
+
+# MGCCFF (AAAI 2025)
+git clone https://github.com/AlanWang2000/MGCCFF.git MGCCFF
+
+# FreeCSL (CVPR 2025)
+git clone https://github.com/zoyadai/2025_CVPR_FreeCSL.git 2025_CVPR_FreeCSL
+
+# ROLL (CVPR 2025)
+git clone https://github.com/sunyuan-cs/2025-CVPR-ROLL.git 2025-CVPR-ROLL
+
+# PROTOCOL (ICML 2025)
+git clone https://github.com/Scarlett125/PROTOCOL.git PROTOCOL
 ```
 
 ## 鲁棒性测试说明
