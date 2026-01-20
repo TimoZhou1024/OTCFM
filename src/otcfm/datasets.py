@@ -256,17 +256,43 @@ def load_noisy_mnist(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
 
 
 def load_bdgp(data_dir: str) -> Tuple[List[np.ndarray], np.ndarray]:
-    """Load BDGP dataset"""
+    """Load BDGP dataset
+    
+    BDGP.mat contains:
+    - X: object array (3, 1) containing 3 views [1000-dim, 500-dim, 250-dim]
+    - Y: labels (2500, 1) with 5 classes
+    """
     path = os.path.join(data_dir, "BDGP.mat")
     if not os.path.exists(path):
         raise FileNotFoundError(f"Please download BDGP.mat to {data_dir}")
     
     data = sio.loadmat(path)
-    views = [
-        np.array(data['X1'], dtype=np.float32),
-        np.array(data['X2'], dtype=np.float32)
-    ]
-    labels = np.array(data['Y']).flatten() - 1
+    
+    # Check data format
+    if 'X' in data and data['X'].dtype == object:
+        # Views stored as object array
+        X = data['X']
+        views = []
+        for i in range(X.shape[0]):
+            view_data = X[i, 0]
+            if hasattr(view_data, 'toarray'):  # Handle sparse matrices
+                view_data = view_data.toarray()
+            views.append(np.array(view_data, dtype=np.float32))
+    else:
+        # Standard format with X1, X2, etc.
+        views = []
+        for key in ['X1', 'X2', 'X3']:
+            if key in data:
+                view_data = data[key]
+                if hasattr(view_data, 'toarray'):
+                    view_data = view_data.toarray()
+                views.append(np.array(view_data, dtype=np.float32))
+    
+    labels = np.array(data['Y']).flatten()
+    # Convert to 0-indexed if needed
+    if labels.min() >= 1:
+        labels = labels - 1
+    
     return views, labels
 
 
