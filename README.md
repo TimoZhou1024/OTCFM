@@ -105,7 +105,12 @@ OT-CFM/
 │   ├── run_optuna_tuning.py      # Optuna hyperparameter tuning
 │   ├── tune_all_datasets.py      # Batch tuning for all datasets
 │   ├── run_robustness_test.py    # Robustness testing (incomplete & unaligned data)
-│   └── run_ablation.py           # Comprehensive ablation study
+│   ├── run_ablation.py           # Comprehensive ablation study
+│   ├── run_sensitivity_analysis.py  # Publication-quality sensitivity analysis
+│   ├── generate_latex_tables.py  # Generate LaTeX tables from results
+│   ├── demo_sensitivity_usage.py # Usage demonstration and examples
+│   ├── test_sensitivity_analysis.py  # Quick test suite
+│   └── run_all_sensitivity.bat   # Batch processing for multiple datasets
 ├── external_methods/             # External SOTA baselines (clone here)
 │   ├── MFLVC/                    # CVPR 2022
 │   ├── SURE/                     # TPAMI 2022
@@ -593,6 +598,85 @@ All metrics are implemented in `src/otcfm/metrics.py`:
 - **Silhouette**: Silhouette coefficient
 - **Davies-Bouldin**: Davies-Bouldin index
 - **Calinski-Harabasz**: Calinski-Harabasz index
+
+## Sensitivity Analysis
+
+OT-CFM provides publication-quality sensitivity analysis tools to systematically evaluate hyperparameter impact. This is essential for understanding model robustness and for top-tier conference submissions (ICML, NeurIPS, CVPR).
+
+### Quick Start
+
+```bash
+# Single parameter sweep (lambda_gw)
+uv run python scripts/run_sensitivity_analysis.py \
+    --dataset Scene15 \
+    --mode single \
+    --param lambda_gw \
+    --epochs 100 \
+    --num_runs 3
+
+# Two-parameter grid search with 3D visualization
+uv run python scripts/run_sensitivity_analysis.py \
+    --dataset Handwritten \
+    --mode grid \
+    --param lambda_gw lambda_cluster \
+    --plot_3d
+
+# Full sensitivity analysis (all parameters)
+uv run python scripts/run_sensitivity_analysis.py \
+    --dataset Scene15 \
+    --mode full \
+    --quick_mode
+```
+
+### Parameters Analyzed
+
+| Category | Parameters | Default | Range |
+|----------|-----------|---------|-------|
+| **Loss Weights** | `lambda_gw` | 0.2 | [0.01, 1.0] |
+| | `lambda_cluster` | 1.0 | [0.1, 10.0] |
+| | `lambda_recon` | 0.5 | [0.1, 3.0] |
+| | `lambda_contrastive` | 0.3 | [0.01, 1.0] |
+| **Architecture** | `latent_dim` | 128 | [32, 384] |
+| | `flow_hidden_dim` | 256 | [128, 512] |
+| | `ode_steps` | 10 | [5, 50] |
+| **Training** | `learning_rate` | 0.001 | [0.0001, 0.01] |
+| | `dropout` | 0.1 | [0.0, 0.5] |
+
+### Output Files
+
+Results are saved to `results/sensitivity/`:
+
+1. **CSV**: Detailed results with mean and std for all metrics
+2. **JSON**: Metadata and structured data for further analysis
+3. **Plots**:
+   - Single parameter: Line plots with error bands for ACC, NMI, ARI, F1
+   - Grid search: Heatmaps showing performance surfaces
+   - 3D plots: Surface plots for two-parameter analysis (optional)
+4. **Statistical Report**: 
+   - Best/worst parameter values
+   - Sensitivity scores
+   - Correlation analysis with p-values
+
+### Example Output
+
+Single parameter sweep generates:
+- `Scene15_sensitivity_single_lambda_gw_20260114_123456.csv`
+- `Scene15_sensitivity_single_lambda_gw_20260114_123456.json`
+- `Scene15_sensitivity_lambda_gw_20260114_123456.png` (and `.pdf`)
+- `Scene15_statistics_single_lambda_gw_20260114_123456.txt`
+
+Grid search additionally generates:
+- `Scene15_heatmap_lambda_gw_lambda_cluster_20260114_123456.png`
+- `Scene15_3d_ACC_lambda_gw_lambda_cluster_20260114_123456.png` (if `--plot_3d`)
+
+### Quick Test
+
+```bash
+# Test the framework with minimal settings
+uv run python scripts/test_sensitivity_analysis.py
+```
+
+**For detailed usage and interpretation guidelines, see [docs/sensitivity_analysis_guide.md](docs/sensitivity_analysis_guide.md)**
 
 ## Command Line Reference
 
