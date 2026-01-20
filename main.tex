@@ -75,7 +75,9 @@
 \printAffiliationsAndNotice{}
 
 \begin{abstract}
-Multi-view clustering (MVC) confronts dual challenges in real-world deployments: data incompleteness (missing views) and structural misalignment (unaligned samples). While Diffusion Models (DMs) have shown promise in generative imputation, their stochastic nature and iterative sampling impose high computational latency, and they inherently lack mechanisms to handle unaligned cross-view structures. We propose \textbf{Optimal Transport Coupled Flow Matching (OT-CFM)}, a unified framework that leverages the deterministic nature of continuous normalizing flows and the geometric properties of Optimal Transport. Unlike traditional methods that require explicit alignment steps or stochastic multistep generation, OT-CFM learns a cross-view flow that optimally transports view-specific latent representations toward a structurally aligned consensus centroid. This process enables deterministic, efficient view completion and alignment-free fusion simultaneously. Specifically, we introduce: (1) a cross-view flow matching objective that learns transformations from each view to the consensus space; (2) a Gromov-Wasserstein structural coupling loss computed on encoded representations that aligns intra-view geometry \textit{without requiring sample correspondences}, making it suitable for unaligned scenarios; (3) a cosine similarity-based soft clustering mechanism; and (4) an optional contrastive regularization for aligned settings where sample correspondences are known. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that OT-CFM achieves competitive performance with state-of-the-art methods while offering significantly faster inference.
+This paper presents a structure-aware Flow Matching framework for multi-view clustering, designed to simultaneously perform missing information generation and alignment-free multi-view fusion in a unified and deterministic manner.
+%Multi-view clustering (MVC) confronts dual challenges in real-world deployments: data incompleteness (missing views) and structural misalignment (unaligned samples). While Diffusion Models (DMs) have shown promise in generative imputation, their stochastic nature and iterative sampling impose high computational latency, and they inherently lack mechanisms to handle unaligned cross-view structures. We propose \textbf{Optimal Transport Coupled Flow Matching (OT-CFM)}, a unified framework that leverages the deterministic nature of continuous normalizing flows and the geometric properties of Optimal Transport. Unlike traditional methods that require explicit alignment steps or stochastic multistep generation, OT-CFM learns a cross-view flow that optimally transports view-specific latent representations toward a structurally aligned consensus centroid. This process enables deterministic, efficient view completion and alignment-free fusion simultaneously. 
+Specifically, we introduce: (1) a cross-view flow matching objective that learns transformations from each view to the consensus space; (2) a Gromov-Wasserstein structural coupling loss computed on encoded representations that aligns intra-view geometry \textit{without requiring sample correspondences}, making it suitable for unaligned scenarios; (3) a cosine similarity-based soft clustering mechanism; and (4) an optional contrastive regularization for aligned settings where sample correspondences are known. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that OT-CFM achieves competitive performance with state-of-the-art methods while offering significantly faster inference.
 \end{abstract}
 
 \section{Introduction}\label{introduction}
@@ -83,7 +85,8 @@ Multi-view clustering (MVC) confronts dual challenges in real-world deployments:
 Multi-view clustering (MVC) aims to partition samples into distinct groups by integrating complementary information from multiple heterogeneous data sources, and has attracted significant attention in machine learning and data mining communities \cite{chaoSurveyMultiviewClustering2021,chowdhuryDeepMultiviewClustering2025}. However, most existing MVC methods \cite{xuMultilevelFeatureLearning2022,zhangLetDataChoose2023,renDynamicWeightedGraph2024} are designed for \textit{ideal} multi-view data, which assumes that all views are \textit{complete} (every sample has observations in all views) and \textit{aligned} (samples across different views have known one-to-one correspondences). In real-world applications, such ideal assumptions are often violated. For instance, in medical diagnosis, a patient may have CT scans but lack MRI images due to cost or availability constraints, resulting in \textit{incomplete} views \cite{linCOMPLETERIncompleteMultiview2021}. 
 In social media analysis, user profiles across different platforms (e.g., Twitter and LinkedIn) often lack explicit linking, creating naturally unaligned multi-view scenarios \cite{xinMultilevelReliableGuidance2025}. Consequently, the problem of clustering multi-view data under simultaneous incompleteness and misalignment remains largely unresolved, posing a fundamental challenge to existing multi-view learning paradigms. %%In cross-lingual document clustering, different language versions of documents may not have explicit correspondence annotations, leading to \textit{unaligned} views \cite{huangPartiallyViewalignedClustering2020a}. Similarly,  How to effectively cluster such non-ideal multi-view data---characterized by incompleteness and misalignment---has emerged as a critical research challenge.
 
-To address these challenges, recent works have focused on either incomplete multi-view clustering (IMVC) or unaligned multi-view clustering (UMVC). For the \textit{incomplete} multi-view scenario (IMVC), COMPLETER \cite{linCOMPLETERIncompleteMultiview2021} employs contrastive learning to predict missing views through cross-view feature alignment, while SURE \cite{yangRobustMultiViewClustering2023} integrates uncertainty estimation into the view recovery process for robust imputation. DealMVC \cite{yangRobustMultiViewClustering2023} further introduces dual contrastive prediction with prototype alignment to handle partial sample and view missing. More recently, diffusion-based methods such as DCG \cite{zhangIncompleteMultiviewClustering2025a} leverage conditional diffusion models to generate missing views and enhance clustering compactness through iterative denoising. For the \textit{unaligned} multi-view scenario (UMVC), PVC \cite{huangPartiallyViewalignedClustering2020a} formulates alignment as a permutation learning problem using differentiable matching networks. MRG-UMC \cite{xinMultilevelReliableGuidance2025} constructs multi-level reliable guidance for unpaired samples by exploiting both local and global structural information, and CANDY \cite{guoRobustContrastiveMultiview2024a} addresses dual noisy correspondence via robust contrastive learning with noise-tolerant mechanisms.
+To address these challenges, recent studies have increasingly focused on developing effective methods for mining non-ideal multi-view data, thereby enabling robust multi-view clustering. 
+For the \textit{incomplete} multi-view scenario (IMVC), COMPLETER \cite{linCOMPLETERIncompleteMultiview2021} employs contrastive learning to predict missing views through cross-view feature alignment, while SURE \cite{yangRobustMultiViewClustering2023} integrates uncertainty estimation into the view recovery process for robust imputation. DealMVC \cite{yangRobustMultiViewClustering2023} further introduces dual contrastive prediction with prototype alignment to handle partial sample and view missing. More recently, diffusion-based methods such as DCG \cite{zhangIncompleteMultiviewClustering2025a} leverage conditional diffusion models to generate missing views and enhance clustering compactness through iterative denoising. For the \textit{unaligned} multi-view scenario (UMVC), PVC \cite{huangPartiallyViewalignedClustering2020a} formulates alignment as a permutation learning problem using differentiable matching networks. MRG-UMC \cite{xinMultilevelReliableGuidance2025} constructs multi-level reliable guidance for unpaired samples by exploiting both local and global structural information, and CANDY \cite{guoRobustContrastiveMultiview2024a} addresses dual noisy correspondence via robust contrastive learning with noise-tolerant mechanisms.
 
 Although these methods have achieved promising performance in incomplete or unaligned multi-view clustering, they still suffer from several critical limitations. \textbf{First}, most existing methods treat incomplete and unaligned scenarios as separate problems, employing distinct pipelines for view imputation and correspondence alignment respectively. This two-stage paradigm inevitably leads to error propagation between stages and suboptimal multi-view fusion, as errors from the imputation stage directly compromise the subsequent alignment or clustering performance. \textbf{Second}, for incomplete multi-view scenarios, existing MVC methods increasingly adopt generative models to impute missing views before clustering. Recent diffusion-based MVC approaches \cite{zhangIncompleteMultiviewClustering2025a} have demonstrated superior generation quality by modeling view completion as iterative denoising governed by stochastic differential equations (SDEs). However, \textit{the inherent sequential nature of SDE-based generation fundamentally conflicts with the scalability and efficiency requirements of multi-view clustering}. Diffusion models operate through a Markov chain $\mathbf{x}_T \to \mathbf{x}_{T-1} \to \cdots \to \mathbf{x}_0$ requiring $T = 100 \sim 1000$ denoising steps, each involving a neural network evaluation. For MVC tasks, this iterative paradigm translates to $O(N \cdot r \cdot V \cdot T)$ network forward passes to impute missing views across $N$ samples with missing rate $r$ and $V$ views---a prohibitive computational burden \textit{before clustering can even commence}. In practical MVC applications such as online recommendation systems, real-time video surveillance, or interactive data exploration platforms, where rapid clustering updates on streaming multi-view data are essential, such high inference latency (often taking seconds per sample for high-fidelity generation with $T \geq 1000$) renders diffusion-based imputation infeasible. \textit{The MVC problem inherently demands a view completion mechanism that jointly optimizes generation fidelity and inference efficiency}---a requirement that existing diffusion-based MVC methods fail to satisfy. \textbf{Third}, for unaligned multi-view scenarios, many existing alignment methods \cite{huangPartiallyViewalignedClustering2020a,xinMultilevelReliableGuidance2025} require explicit correspondence supervision or annotated sample pairs for training, which is expensive or even infeasible to obtain in real-world scenarios where cross-view correspondences are inherently unknown. \textbf{Fourth}, even unsupervised alignment methods often rely on expensive combinatorial optimization procedures (e.g., solving the assignment problem via the Hungarian algorithm with $O(N^3)$ complexity per iteration), which severely limits their scalability to large-scale datasets and real-time applications.
 
@@ -481,19 +484,19 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
 \begin{tabular}{llcccccccccccc}
 \toprule
 & Method & \multicolumn{3}{c}{0\%} & \multicolumn{3}{c}{10\%} & \multicolumn{3}{c}{30\%} & \multicolumn{3}{c}{50\%} \\
- &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
+ &  & A & N & R & A & N & R & A & N & R & A & N & R \\
 \midrule
-\multirow{10}{*}{\rotatebox{90}{Scene15}}
- & OT-CFM & \underline{45.1$_{\pm0.8}$} & 43.8$_{\pm1.1}$ & 28.5$_{\pm1.0}$ & \underline{45.4$_{\pm1.0}$} & 44.3$_{\pm1.0}$ & \underline{29.2$_{\pm0.3}$} & 44.7$_{\pm0.4}$ & 43.5$_{\pm0.5}$ & 28.2$_{\pm1.1}$ & \textbf{43.5$_{\pm1.4}$} & \textbf{41.9$_{\pm0.1}$} & \textbf{27.3$_{\pm1.0}$} \\
- & MFLVC (CVPR22) & 36.9 & 36.0 & 20.5 & 36.9 & 36.0 & 20.5 & 36.9 & 36.0 & 20.5 & \underline{33.0} & \underline{34.8} & \underline{19.1} \\
- & SURE (TPAMI22) & 39.9 & 41.8 & 24.2 & 41.4 & 42.0 & 25.2 & 41.4 & 42.0 & 25.2 & 22.7 & 27.1 & 10.4 \\
- & DealMVC (CVPR23) & 35.8 & 38.8 & 21.5 & 35.8 & 38.8 & 21.5 & 35.8 & 38.8 & 21.5 & 18.3 & 24.1 & 7.9 \\
- & GCFAggMVC (CVPR23) & \textbf{46.0} & \underline{45.6} & \textbf{29.9} & \textbf{46.0} & \underline{45.6} & \textbf{29.9} & \textbf{46.0} & \underline{45.6} & \textbf{29.9} & 24.3 & 26.6 & 10.7 \\
- & DCG (AAAI25) & 38.6 & 40.7 & 22.4 & 38.6 & 40.7 & 22.4 & 38.6 & 40.7 & 22.4 & 27.0 & 27.6 & 12.1 \\
- & MGCCFF (AAAI25) & 17.8 & 11.0 & 2.9 & 17.8 & 11.0 & 2.9 & 17.8 & 11.0 & 2.9 & 14.9 & 7.2 & 1.0 \\
- & FreeCSL (CVPR25) & 25.9 & 18.1 & 9.6 & 25.9 & 18.1 & 9.6 & 25.9 & 18.1 & 9.6 & 19.2 & 10.2 & 4.7 \\
- & ROLL (CVPR25) & 44.8 & \textbf{47.4} & \underline{28.9} & 44.8 & \textbf{47.4} & 28.9 & \underline{44.8} & \textbf{47.4} & \underline{28.9} & 22.1 & 28.2 & 11.6 \\
- & PROTOCOL (ICML25) & 38.6 & 40.7 & 22.4 & 38.6 & 40.7 & 22.4 & 38.6 & 40.7 & 22.4 & 27.0 & 27.6 & 12.1 \\
+\multirow{10}{*}{\rotatebox{90}{BDGP}}
+ & OT-CFM & \textbf{50.5$_{\pm1.2}$} & \underline{27.3$_{\pm1.0}$} & \textbf{24.8$_{\pm1.2}$} & \textbf{50.4$_{\pm1.2}$} & \underline{27.2$_{\pm0.8}$} & \textbf{24.7$_{\pm1.1}$} & \textbf{50.4$_{\pm1.0}$} & \underline{27.2$_{\pm0.6}$} & \textbf{24.7$_{\pm0.9}$} & \textbf{46.6$_{\pm1.6}$} & \textbf{19.8$_{\pm1.3}$} & \textbf{17.8$_{\pm2.1}$} \\
+ & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 26.8 & 2.9 & 1.7 \\
+ & SURE (TPAMI22) & 35.5 & 16.2 & 8.5 & 41.8 & 16.8 & 9.9 & 41.8 & 16.8 & 9.9 & 31.0 & 9.0 & 6.3 \\
+ & DealMVC (CVPR23) & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.5 & 2.4 & 1.3 \\
+ & GCFAggMVC (CVPR23) & 31.1 & 5.9 & 4.8 & 31.1 & 5.9 & 4.8 & 31.1 & 5.9 & 4.8 & 24.5 & 2.4 & 1.3 \\
+ & DCG (AAAI25) & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{39.2} & \underline{18.3} & \underline{11.3} \\
+ & MGCCFF (AAAI25) & 26.6 & 2.5 & 1.4 & 26.6 & 2.5 & 1.4 & 26.6 & 2.5 & 1.4 & 24.5 & 1.3 & 0.6 \\
+ & FreeCSL (CVPR25) & 31.2 & 6.0 & 4.9 & 31.2 & 6.0 & 4.9 & 31.2 & 6.0 & 4.9 & 25.6 & 2.9 & 1.5 \\
+ & ROLL (CVPR25) & 30.4 & 7.3 & 5.9 & 30.4 & 7.3 & 5.9 & 30.4 & 7.3 & 5.9 & 22.8 & 0.7 & 0.2 \\
+ & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 25.4 & 2.7 & 1.6 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{Coil20}}
  & OT-CFM & \textbf{88.7$_{\pm0.7}$} & \textbf{93.8$_{\pm0.4}$} & \textbf{86.4$_{\pm0.2}$} & \textbf{88.4$_{\pm0.4}$} & \textbf{93.7$_{\pm0.9}$} & \textbf{86.2$_{\pm0.4}$} & \textbf{88.4$_{\pm0.4}$} & \textbf{93.7$_{\pm0.9}$} & \textbf{86.2$_{\pm0.4}$} & \textbf{87.6$_{\pm0.8}$} & \textbf{92.9$_{\pm0.2}$} & \textbf{84.6$_{\pm0.9}$} \\
@@ -519,6 +522,18 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & ROLL (CVPR25) & 75.0 & 72.8 & 59.6 & 75.0 & 72.8 & 59.6 & 75.0 & 72.8 & 59.6 & 38.3 & 41.3 & 22.0 \\
  & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 33.3 & 28.8 & 5.0 \\
 \midrule
+\multirow{10}{*}{\rotatebox{90}{Handwritten}}
+ & OT-CFM & \underline{94.1$_{\pm0.8}$} & \underline{88.5$_{\pm1.1}$} & \underline{87.3$_{\pm1.6}$} & \underline{94.1$_{\pm0.8}$} & \underline{88.5$_{\pm1.1}$} & \underline{87.3$_{\pm1.5}$} & \textbf{93.7$_{\pm0.7}$} & \textbf{87.8$_{\pm1.1}$} & \textbf{86.5$_{\pm1.4}$} & \textbf{92.7$_{\pm0.8}$} & \textbf{85.8$_{\pm1.3}$} & \textbf{84.4$_{\pm1.6}$} \\
+ & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 84.0 & 82.2 & 76.0 & 85.3 & \underline{83.8} & \underline{78.5} & \underline{84.3} & \underline{81.8} & \underline{76.2} \\
+ & SURE (TPAMI22) & 73.0 & 71.2 & 62.0 & 77.1 & 73.1 & 62.5 & 49.2 & 47.1 & 30.5 & 27.7 & 26.7 & 10.6 \\
+ & DealMVC (CVPR23) & 80.2 & 77.4 & 69.2 & 80.2 & 77.4 & 69.2 & 69.4 & 72.2 & 57.2 & 31.2 & 27.3 & 11.9 \\
+ & GCFAggMVC (CVPR23) & 80.5 & 78.3 & 69.6 & 80.5 & 78.3 & 69.6 & 80.3 & 77.4 & 69.6 & 13.2 & 0.9 & -0.0 \\
+ & DCG (AAAI25) & 92.4 & 85.7 & 83.8 & 92.4 & 85.7 & 83.8 & \underline{89.2} & 81.6 & 78.1 & 48.1 & 48.3 & 25.0 \\
+ & MGCCFF (AAAI25) & 17.8 & 7.5 & 3.2 & 17.8 & 7.5 & 3.2 & 17.8 & 5.4 & 2.3 & 16.9 & 4.9 & 2.1 \\
+ & FreeCSL (CVPR25) & 30.2 & 16.9 & 9.8 & 30.2 & 16.9 & 9.8 & 30.7 & 13.6 & 8.5 & 21.3 & 7.2 & 3.5 \\
+ & ROLL (CVPR25) & \textbf{97.2} & \textbf{93.7} & \textbf{93.8} & \textbf{97.2} & \textbf{93.7} & \textbf{93.8} & 71.6 & 73.3 & 63.2 & 12.8 & 0.8 & -0.0 \\
+ & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 80.5 & 74.9 & 70.0 & 63.4 & 57.4 & 44.3 & 37.4 & 32.2 & 15.1 \\
+\midrule
 \multirow{10}{*}{\rotatebox{90}{NUS-WIDE}}
  & OT-CFM & \textbf{19.0$_{\pm0.7}$} & 18.7$_{\pm2.5}$ & 6.3$_{\pm0.1}$ & \textbf{19.4$_{\pm0.8}$} & 17.9$_{\pm3.4}$ & 5.2$_{\pm1.5}$ & \textbf{19.9$_{\pm0.6}$} & 15.9$_{\pm1.1}$ & \textbf{5.9$_{\pm1.0}$} & \textbf{19.1$_{\pm0.5}$} & \underline{17.3$_{\pm3.0}$} & \textbf{6.5$_{\pm0.8}$} \\
  & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.6 & \underline{23.1} & 6.2 & \underline{15.2} & \textbf{21.5} & \underline{5.3} & \underline{14.9} & \textbf{19.7} & \underline{4.9} \\
@@ -538,6 +553,8 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
 \vskip -0.1in
 \end{table*}
 
+\textit{Note: A=ACC(\%), N=NMI(\%), R=ARI(\%)}
+
 
 \textbf{Analysis:} As the missing rate increases, the performance of all methods drops. However, OT-CFM maintains high stability, degrading much slower than baselines. This confirms that our Cross-View Flow Matching effectively imputes missing semantics from available views.
 
@@ -555,18 +572,18 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
 \begin{tabular}{llcccccccccccc}
 \toprule
 & Method & \multicolumn{3}{c}{0\%} & \multicolumn{3}{c}{20\%} & \multicolumn{3}{c}{40\%} & \multicolumn{3}{c}{60\%} \\
- &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
+ &  & A & N & R & A & N & R & A & N & R & A & N & R \\
 \midrule
-\multirow{9}{*}{\rotatebox{90}{Scene15}}
- & OT-CFM & 44.5$_{\pm0.3}$ & 43.5$_{\pm0.2}$ & 28.4$_{\pm0.4}$ & 40.6$_{\pm1.3}$ & 35.2$_{\pm0.6}$ & 22.7$_{\pm0.1}$ & 36.4$_{\pm3.2}$ & 30.6$_{\pm7.2}$ & \underline{18.4$_{\pm4.6}$} & 31.9$_{\pm1.0}$ & \textbf{33.3$_{\pm1.2}$} & \textbf{17.5$_{\pm0.6}$} \\
- & MFLVC (CVPR22) & 36.9 & 36.0 & 20.5 & 38.1 & 33.4 & 20.0 & 35.7 & 29.2 & 17.1 & 31.4 & 25.9 & 14.0 \\
- & GCFAggMVC (CVPR23) & \underline{46.0} & 45.6 & \underline{29.9} & \textbf{42.5} & \underline{37.5} & \textbf{24.2} & \textbf{41.5} & \textbf{33.4} & \textbf{21.6} & \textbf{34.4} & 26.1 & \underline{15.3} \\
- & MRG-UMC (TNNLS25) & 39.8 & 41.9 & 23.3 & 36.9 & 31.9 & 17.9 & 32.2 & 24.8 & 13.5 & 26.4 & 20.0 & 9.5 \\
- & CANDY (NeurIPS24) & \textbf{48.8} & \underline{46.4} & \textbf{31.3} & \underline{42.3} & 35.6 & \underline{23.2} & \underline{37.0} & 27.3 & 16.6 & \underline{33.7} & 25.7 & 14.9 \\
- & MGCCFF (AAAI25) & 17.8 & 11.0 & 2.9 & 15.9 & 8.8 & 2.0 & 14.5 & 7.6 & 1.3 & 14.0 & 6.6 & 1.0 \\
- & FreeCSL (CVPR25) & 25.9 & 18.1 & 9.6 & 19.4 & 10.4 & 4.5 & 15.8 & 6.1 & 2.4 & 13.1 & 3.4 & 1.2 \\
- & ROLL (CVPR25) & 44.8 & \textbf{47.4} & 28.9 & 36.6 & \textbf{38.7} & 21.4 & 31.3 & \underline{32.8} & 16.5 & 26.3 & \underline{28.1} & 12.8 \\
- & PROTOCOL (ICML25) & 38.6 & 40.7 & 22.4 & 30.6 & 27.2 & 14.6 & 28.1 & 21.9 & 11.2 & 22.7 & 15.0 & 6.8 \\
+\multirow{9}{*}{\rotatebox{90}{BDGP}}
+ & OT-CFM & \textbf{50.3$_{\pm1.2}$} & \textbf{27.6$_{\pm1.8}$} & \textbf{25.1$_{\pm1.9}$} & \textbf{48.3$_{\pm2.4}$} & \textbf{25.2$_{\pm3.5}$} & \textbf{22.8$_{\pm3.7}$} & \textbf{48.0$_{\pm4.0}$} & \textbf{25.3$_{\pm3.9}$} & \textbf{23.1$_{\pm3.5}$} & \textbf{46.3$_{\pm4.0}$} & \textbf{23.6$_{\pm4.6}$} & \textbf{21.7$_{\pm3.8}$} \\
+ & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 \\
+ & GCFAggMVC (CVPR23) & 31.1 & 5.9 & 4.8 & 29.6 & 4.2 & 3.4 & 27.2 & 2.6 & 1.7 & 25.5 & 1.8 & 1.1 \\
+ & MRG-UMC (TNNLS25) & \underline{37.9} & \underline{12.1} & \underline{9.4} & \underline{35.2} & \underline{7.9} & \underline{6.3} & 26.5 & 2.6 & 1.9 & \underline{36.6} & \underline{15.3} & \underline{12.3} \\
+ & CANDY (NeurIPS24) & 33.4 & 7.3 & 5.6 & 28.5 & 3.9 & 3.2 & 26.2 & 2.0 & 1.5 & 25.3 & 1.6 & 1.0 \\
+ & MGCCFF (AAAI25) & 26.6 & 2.5 & 1.4 & 25.4 & 1.7 & 0.9 & 23.0 & 0.7 & 0.3 & 22.3 & 0.3 & 0.1 \\
+ & FreeCSL (CVPR25) & 31.2 & 6.0 & 4.9 & 29.3 & 4.1 & 3.3 & 26.4 & 2.0 & 1.5 & 25.5 & 1.7 & 1.0 \\
+ & ROLL (CVPR25) & 30.4 & 7.3 & 5.9 & 29.0 & 5.9 & 4.8 & 26.8 & \underline{2.7} & \underline{2.0} & 25.5 & 1.7 & 1.4 \\
+ & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 31.3 & 4.8 & 3.3 & \underline{29.2} & 2.6 & 1.6 & 26.4 & 1.5 & 0.9 \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{Coil20}}
  & OT-CFM & \textbf{88.7$_{\pm0.7}$} & \textbf{93.8$_{\pm0.4}$} & \textbf{86.4$_{\pm0.2}$} & \textbf{73.5$_{\pm1.6}$} & \textbf{75.5$_{\pm1.4}$} & \textbf{60.3$_{\pm2.1}$} & \textbf{66.4$_{\pm3.4}$} & \textbf{63.2$_{\pm2.3}$} & \textbf{45.8$_{\pm3.6}$} & \textbf{51.5$_{\pm1.4}$} & \textbf{49.2$_{\pm1.5}$} & \textbf{28.4$_{\pm2.2}$} \\
@@ -590,6 +607,17 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & ROLL (CVPR25) & 75.0 & 72.8 & 59.6 & 52.5 & 49.0 & 37.4 & 41.8 & 24.4 & 15.7 & 35.3 & 17.8 & 10.2 \\
  & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 54.3 & \underline{60.1} & \underline{44.0} & \underline{59.3} & \textbf{61.3} & \textbf{46.3} & \textbf{55.7} & \textbf{61.7} & \textbf{46.7} \\
 \midrule
+\multirow{9}{*}{\rotatebox{90}{Handwritten}}
+ & OT-CFM & \underline{94.1$_{\pm0.7}$} & 88.5$_{\pm1.0}$ & \underline{87.3$_{\pm1.5}$} & \underline{74.6$_{\pm0.5}$} & 60.8$_{\pm0.9}$ & \underline{57.7$_{\pm1.1}$} & \textbf{61.6$_{\pm0.4}$} & \underline{41.8$_{\pm0.4}$} & \textbf{38.0$_{\pm0.5}$} & \underline{45.6$_{\pm0.3}$} & \underline{25.3$_{\pm0.3}$} & \underline{21.1$_{\pm0.3}$} \\
+ & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 74.2 & 58.9 & 55.4 & \underline{60.2} & 39.1 & \underline{34.5} & 44.2 & 20.5 & 16.1 \\
+ & GCFAggMVC (CVPR23) & 80.5 & 78.3 & 69.6 & 69.3 & 52.5 & 47.9 & 52.9 & 30.2 & 25.3 & 39.1 & 15.9 & 11.9 \\
+ & MRG-UMC (TNNLS25) & 93.8 & \underline{88.9} & 87.3 & \textbf{80.8} & \underline{65.0} & \textbf{61.1} & 57.2 & \textbf{48.7} & 31.3 & \textbf{50.7} & \textbf{38.2} & \textbf{25.7} \\
+ & CANDY (NeurIPS24) & 85.5 & 84.0 & 79.0 & 70.8 & 60.1 & 49.1 & 54.6 & 41.1 & 23.7 & 36.6 & 16.9 & 10.3 \\
+ & MGCCFF (AAAI25) & 17.8 & 7.5 & 3.2 & 16.4 & 5.4 & 2.1 & 14.9 & 3.4 & 1.1 & 14.0 & 2.3 & 0.5 \\
+ & FreeCSL (CVPR25) & 30.2 & 16.9 & 9.8 & 25.2 & 10.2 & 5.6 & 20.5 & 6.0 & 2.7 & 16.5 & 3.5 & 1.5 \\
+ & ROLL (CVPR25) & \textbf{97.2} & \textbf{93.7} & \textbf{93.8} & 72.5 & \textbf{66.2} & 56.2 & 54.4 & 38.0 & 28.7 & 39.6 & 18.6 & 12.0 \\
+ & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 67.5 & 47.8 & 44.9 & 52.8 & 29.6 & 25.6 & 36.7 & 13.7 & 10.3 \\
+\midrule
 \multirow{9}{*}{\rotatebox{90}{NUS-WIDE}}
  & OT-CFM & \textbf{19.6$_{\pm0.6}$} & 16.0$_{\pm0.9}$ & 5.5$_{\pm1.2}$ & \textbf{17.8$_{\pm0.3}$} & 15.9$_{\pm2.0}$ & \textbf{5.2$_{\pm0.5}$} & \textbf{15.9$_{\pm0.7}$} & 12.2$_{\pm2.5}$ & \textbf{3.2$_{\pm0.9}$} & \textbf{14.1$_{\pm0.3}$} & 9.5$_{\pm1.9}$ & 1.7$_{\pm0.6}$ \\
  & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.1 & \underline{18.6} & 4.4 & 13.0 & 15.3 & \underline{3.2} & 11.2 & 11.7 & 1.7 \\
@@ -607,6 +635,10 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
 \end{center}
 \vskip -0.1in
 \end{table*}
+
+\textit{Note: A=ACC(\%), N=NMI(\%), R=ARI(\%)}
+
+
 
 
 \textbf{Analysis:} Traditional methods fail catastrophically when alignment is lost. OT-CFM, armed with the Gromov-Wasserstein loss, successfully aligns geometric structures without needing point-wise correspondence, maintaining high accuracy even at high unaligned rates.
