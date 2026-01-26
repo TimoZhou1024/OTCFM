@@ -21,7 +21,7 @@
 
 % If accepted, instead use the following line for the camera-ready submission:
 % \usepackage[accepted]{icml2026}
-
+\usepackage{tabularx}
 \usepackage{amsmath}
 \DeclareMathOperator*{\argmax}{arg\,max}
 \DeclareMathOperator*{\argmin}{arg\,min}
@@ -343,10 +343,11 @@ This prevents the encoders from collapsing to trivial solutions (e.g., mapping a
 \]
 where we set $\lambda_{gw} = 0.2$, $\lambda_{c} = 1.0$, $\lambda_{r} = 0.5$ as default hyperparameters. The contrastive weight $\lambda_{con}$ is set to $0.3$ for aligned data and $0$ for unaligned data. Table~\ref{tab:loss_config} summarizes the loss configurations for different scenarios.
 
-\begin{table}[h]
+\begin{table}[t]
 \centering
 \caption{Loss function configuration for different MVC scenarios.}
 \label{tab:loss_config}
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lcc}
 \toprule
 \textbf{Component} & \textbf{Aligned (IMVC)} & \textbf{Unaligned (UMVC)} \\
@@ -358,7 +359,8 @@ $\mathcal{L}_{Cluster}$ & \checkmark & \checkmark \\
 $\mathcal{L}_{Recon}$ & \checkmark & \checkmark \\
 $\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \vspace{0.3em}
 \footnotesize{The generative CFM loss is always active; only the conditioning source differs.}
 \end{table}
@@ -693,9 +695,8 @@ We quantify parameter sensitivity using the normalized performance range: $S = (
 \caption{Sensitivity analysis summary for key hyperparameters on Scene-15. Sensitivity score $S$ measures performance variability; higher values indicate parameters requiring careful tuning.}
 \label{tab:sensitivity_summary}
 \vskip 0.1in
-\begin{center}
-\begin{small}
-\begin{sc}
+\centering
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
 Parameter & Sensitivity $S$ & Best Value & ACC \\
@@ -705,10 +706,8 @@ $\lambda_{recon}$   & 0.053 & 1.0   & 0.395$\pm$0.020 \\
 $\lambda_{cluster}$ & 0.051 & 2.68  & 0.399$\pm$0.012 \\
 ODE Steps           & 0.047 & 10    & 0.400$\pm$0.013 \\
 \bottomrule
-\end{tabular}
-\end{sc}
-\end{small}
-\end{center}
+\end{tabular}%
+}
 \vskip -0.1in
 \end{table}
 
@@ -748,7 +747,7 @@ To demonstrate the optimization stability and convergence properties of OT-CFM, 
 \centering
 \caption{Multi-seed convergence statistics on Handwritten (5 runs).}
 \label{tab:convergence_stats}
-\small
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Metric} & \textbf{Mean} & \textbf{Std} & \textbf{Min} & \textbf{Max} \\
@@ -757,7 +756,8 @@ ACC (\%)   & 85.1 & 7.0 & 73.7 & 95.2 \\
 NMI (\%)   & 86.4 & 3.9 & 80.5 & 91.0 \\
 ARI (\%)   & 80.0 & 6.6 & 70.7 & 89.6 \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 % ----------------------------------------------------------------------
@@ -811,13 +811,12 @@ This appendix provides comprehensive sensitivity analysis results for all nine h
 
 Table~\ref{tab:sensitivity_full} presents the complete sensitivity analysis across all hyperparameters, ranked by their influence on clustering accuracy.
 
-\begin{table}[h]
+\begin{table}[t]
 \caption{Complete sensitivity analysis for all hyperparameters on Scene-15. Parameters are ranked by sensitivity score $S$.}
 \label{tab:sensitivity_full}
 \vskip 0.1in
-\begin{center}
-\begin{small}
-\begin{sc}
+\centering
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
 Parameter & Range & $S$ & Best & ACC$_{\text{best}}$ \\
@@ -832,10 +831,8 @@ Learning Rate         & [1e-4, 1e-2]  & 0.035 & 2.2e-3& 0.392$\pm$0.011 \\
 $\lambda_{contrastive}$ & [0.01, 1.0] & 0.022 & 0.01  & 0.394$\pm$0.010 \\
 Flow Hidden Dim       & [128, 512]    & 0.019 & 192   & 0.397$\pm$0.009 \\
 \bottomrule
-\end{tabular}
-\end{sc}
-\end{small}
-\end{center}
+\end{tabular}%
+}
 \end{table}
 
 \subsection{Detailed Analysis by Parameter Category}
