@@ -499,10 +499,10 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
 \begin{tabular}{llcccccccccccc}
 \toprule
 & Method & \multicolumn{3}{c}{0\%} & \multicolumn{3}{c}{10\%} & \multicolumn{3}{c}{30\%} & \multicolumn{3}{c}{50\%} \\
- &  & A & N & R & A & N & R & A & N & R & A & N & R \\
+ &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{BDGP}}
- & OT-CFM & \textbf{50.5$_{\pm1.2}$} & \underline{27.3$_{\pm1.0}$} & \textbf{24.8$_{\pm1.2}$} & \textbf{50.4$_{\pm1.2}$} & \underline{27.2$_{\pm0.8}$} & \textbf{24.7$_{\pm1.1}$} & \textbf{50.4$_{\pm1.0}$} & \underline{27.2$_{\pm0.6}$} & \textbf{24.7$_{\pm0.9}$} & \textbf{46.6$_{\pm1.6}$} & \textbf{19.8$_{\pm1.3}$} & \textbf{17.8$_{\pm2.1}$} \\
+ & OT-CFM & \textbf{50.5} & \underline{27.3} & \textbf{24.8} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{46.6} & \textbf{19.8} & \textbf{17.8} \\
  & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 26.8 & 2.9 & 1.7 \\
  & SURE (TPAMI22) & 35.5 & 16.2 & 8.5 & 41.8 & 16.8 & 9.9 & 41.8 & 16.8 & 9.9 & 31.0 & 9.0 & 6.3 \\
  & DealMVC (CVPR23) & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.5 & 2.4 & 1.3 \\
@@ -514,7 +514,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 25.4 & 2.7 & 1.6 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{Coil20}}
- & OT-CFM & \textbf{88.7$_{\pm0.7}$} & \textbf{93.8$_{\pm0.4}$} & \textbf{86.4$_{\pm0.2}$} & \textbf{88.4$_{\pm0.4}$} & \textbf{93.7$_{\pm0.9}$} & \textbf{86.2$_{\pm0.4}$} & \textbf{88.4$_{\pm0.4}$} & \textbf{93.7$_{\pm0.9}$} & \textbf{86.2$_{\pm0.4}$} & \textbf{87.6$_{\pm0.8}$} & \textbf{92.9$_{\pm0.2}$} & \textbf{84.6$_{\pm0.9}$} \\
+ & OT-CFM & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{87.6} & \textbf{92.9} & \textbf{84.6} \\
  & MFLVC (CVPR22) & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & \underline{48.3} & 63.3 & 35.1 \\
  & SURE (TPAMI22) & 75.2 & 86.0 & 69.0 & 70.2 & 85.0 & 67.1 & 70.2 & 85.0 & 67.1 & 41.5 & 58.4 & 27.4 \\
  & DealMVC (CVPR23) & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 34.6 & 55.9 & 19.3 \\
@@ -526,7 +526,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 41.0 & 60.4 & 29.1 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{CUB}}
- & OT-CFM & \textbf{78.6$_{\pm3.1}$} & \textbf{77.5$_{\pm0.9}$} & \textbf{66.4$_{\pm2.7}$} & \textbf{79.6$_{\pm2.1}$} & \textbf{76.3$_{\pm1.2}$} & \textbf{65.4$_{\pm2.8}$} & \textbf{79.3$_{\pm3.2}$} & \textbf{77.8$_{\pm0.4}$} & \textbf{67.5$_{\pm1.8}$} & \textbf{73.4$_{\pm2.0}$} & \textbf{69.9$_{\pm1.7}$} & \textbf{57.0$_{\pm2.1}$} \\
+ & OT-CFM & \textbf{78.6} & \textbf{77.5} & \textbf{66.4} & \textbf{79.6} & \textbf{76.3} & \textbf{65.4} & \textbf{79.3} & \textbf{77.8} & \textbf{67.5} & \textbf{73.4} & \textbf{69.9} & \textbf{57.0} \\
  & MFLVC (CVPR22) & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 22.3 & 13.1 & 4.9 \\
  & SURE (TPAMI22) & 70.7 & 61.9 & 52.3 & 75.7 & 67.1 & 56.3 & 75.7 & 67.1 & 56.3 & \underline{47.0} & \underline{49.9} & \underline{28.7} \\
  & DealMVC (CVPR23) & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 34.3 & 36.0 & 18.0 \\
@@ -538,7 +538,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 33.3 & 28.8 & 5.0 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{Handwritten}}
- & OT-CFM & \underline{94.1$_{\pm0.8}$} & \underline{88.5$_{\pm1.1}$} & \underline{87.3$_{\pm1.6}$} & \underline{94.1$_{\pm0.8}$} & \underline{88.5$_{\pm1.1}$} & \underline{87.3$_{\pm1.5}$} & \textbf{93.7$_{\pm0.7}$} & \textbf{87.8$_{\pm1.1}$} & \textbf{86.5$_{\pm1.4}$} & \textbf{92.7$_{\pm0.8}$} & \textbf{85.8$_{\pm1.3}$} & \textbf{84.4$_{\pm1.6}$} \\
+ & OT-CFM & \underline{94.1} & \underline{88.5} & \underline{87.3} & \underline{94.1} & \underline{88.5} & \underline{87.3} & \textbf{93.7} & \textbf{87.8} & \textbf{86.5} & \textbf{92.7} & \textbf{85.8} & \textbf{84.4} \\
  & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 84.0 & 82.2 & 76.0 & 85.3 & \underline{83.8} & \underline{78.5} & \underline{84.3} & \underline{81.8} & \underline{76.2} \\
  & SURE (TPAMI22) & 73.0 & 71.2 & 62.0 & 77.1 & 73.1 & 62.5 & 49.2 & 47.1 & 30.5 & 27.7 & 26.7 & 10.6 \\
  & DealMVC (CVPR23) & 80.2 & 77.4 & 69.2 & 80.2 & 77.4 & 69.2 & 69.4 & 72.2 & 57.2 & 31.2 & 27.3 & 11.9 \\
@@ -550,7 +550,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 80.5 & 74.9 & 70.0 & 63.4 & 57.4 & 44.3 & 37.4 & 32.2 & 15.1 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{NUS-WIDE}}
- & OT-CFM & \textbf{19.0$_{\pm0.7}$} & 18.7$_{\pm2.5}$ & 6.3$_{\pm0.1}$ & \textbf{19.4$_{\pm0.8}$} & 17.9$_{\pm3.4}$ & 5.2$_{\pm1.5}$ & \textbf{19.9$_{\pm0.6}$} & 15.9$_{\pm1.1}$ & \textbf{5.9$_{\pm1.0}$} & \textbf{19.1$_{\pm0.5}$} & \underline{17.3$_{\pm3.0}$} & \textbf{6.5$_{\pm0.8}$} \\
+ & OT-CFM & \textbf{19.0} & 18.7 & 6.3 & \textbf{19.4} & 17.9 & 5.2 & \textbf{19.9} & 15.9 & \textbf{5.9} & \textbf{19.1} & \underline{17.3} & \textbf{6.5} \\
  & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.6 & \underline{23.1} & 6.2 & \underline{15.2} & \textbf{21.5} & \underline{5.3} & \underline{14.9} & \textbf{19.7} & \underline{4.9} \\
  & SURE (TPAMI22) & 14.1 & 17.2 & 3.6 & 13.4 & 17.5 & 3.7 & 11.9 & 14.3 & 2.1 & 11.2 & 12.8 & 1.4 \\
  & DealMVC (CVPR23) & 16.4 & 20.8 & \underline{6.3} & 16.4 & 20.8 & \underline{6.3} & 12.2 & 7.7 & 0.4 & 10.2 & 10.0 & 0.7 \\
@@ -568,7 +568,6 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
 \vskip -0.1in
 \end{table*}
 
-\textit{Note: A=ACC(\%), N=NMI(\%), R=ARI(\%)}
 
 
 \textbf{Analysis:} As the missing rate increases, the performance of all methods drops. However, OT-CFM maintains high stability, degrading much slower than baselines. This confirms that our Cross-View Flow Matching effectively imputes missing semantics from available views.
@@ -587,10 +586,10 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
 \begin{tabular}{llcccccccccccc}
 \toprule
 & Method & \multicolumn{3}{c}{0\%} & \multicolumn{3}{c}{20\%} & \multicolumn{3}{c}{40\%} & \multicolumn{3}{c}{60\%} \\
- &  & A & N & R & A & N & R & A & N & R & A & N & R \\
+ &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{BDGP}}
- & OT-CFM & \textbf{50.3$_{\pm1.2}$} & \textbf{27.6$_{\pm1.8}$} & \textbf{25.1$_{\pm1.9}$} & \textbf{48.3$_{\pm2.4}$} & \textbf{25.2$_{\pm3.5}$} & \textbf{22.8$_{\pm3.7}$} & \textbf{48.0$_{\pm4.0}$} & \textbf{25.3$_{\pm3.9}$} & \textbf{23.1$_{\pm3.5}$} & \textbf{46.3$_{\pm4.0}$} & \textbf{23.6$_{\pm4.6}$} & \textbf{21.7$_{\pm3.8}$} \\
+ & OT-CFM & \textbf{50.3} & \textbf{27.6} & \textbf{25.1} & \textbf{48.3} & \textbf{25.2} & \textbf{22.8} & \textbf{48.0} & \textbf{25.3} & \textbf{23.1} & \textbf{46.3} & \textbf{23.6} & \textbf{21.7} \\
  & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 \\
  & GCFAggMVC (CVPR23) & 31.1 & 5.9 & 4.8 & 29.6 & 4.2 & 3.4 & 27.2 & 2.6 & 1.7 & 25.5 & 1.8 & 1.1 \\
  & MRG-UMC (TNNLS25) & \underline{37.9} & \underline{12.1} & \underline{9.4} & \underline{35.2} & \underline{7.9} & \underline{6.3} & 26.5 & 2.6 & 1.9 & \underline{36.6} & \underline{15.3} & \underline{12.3} \\
@@ -601,7 +600,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 31.3 & 4.8 & 3.3 & \underline{29.2} & 2.6 & 1.6 & 26.4 & 1.5 & 0.9 \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{Coil20}}
- & OT-CFM & \textbf{88.7$_{\pm0.7}$} & \textbf{93.8$_{\pm0.4}$} & \textbf{86.4$_{\pm0.2}$} & \textbf{73.5$_{\pm1.6}$} & \textbf{75.5$_{\pm1.4}$} & \textbf{60.3$_{\pm2.1}$} & \textbf{66.4$_{\pm3.4}$} & \textbf{63.2$_{\pm2.3}$} & \textbf{45.8$_{\pm3.6}$} & \textbf{51.5$_{\pm1.4}$} & \textbf{49.2$_{\pm1.5}$} & \textbf{28.4$_{\pm2.2}$} \\
+ & OT-CFM & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{73.5} & \textbf{75.5} & \textbf{60.3} & \textbf{66.4} & \textbf{63.2} & \textbf{45.8} & \textbf{51.5} & \textbf{49.2} & \textbf{28.4} \\
  & MFLVC (CVPR22) & 57.9 & 77.0 & 48.9 & 44.6 & 58.2 & 34.6 & 38.3 & 44.9 & 22.0 & 33.1 & 36.9 & 15.5 \\
  & GCFAggMVC (CVPR23) & 78.5 & 87.2 & 73.1 & 61.9 & 67.6 & 47.3 & 51.2 & 56.0 & \underline{33.8} & 38.3 & 44.3 & 20.3 \\
  & MRG-UMC (TNNLS25) & 61.3 & 83.1 & 59.3 & 59.2 & 67.7 & 44.4 & 39.6 & 51.4 & 23.9 & 33.3 & 43.1 & 16.8 \\
@@ -612,7 +611,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 63.7 & 82.6 & 61.9 & 46.7 & 63.5 & 37.7 & 44.0 & 52.8 & 27.6 & 33.3 & 41.7 & 15.9 \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{CUB}}
- & OT-CFM & \textbf{79.2$_{\pm3.3}$} & \textbf{77.4$_{\pm0.9}$} & \textbf{67.1$_{\pm2.8}$} & \textbf{69.5$_{\pm1.6}$} & \textbf{61.9$_{\pm1.7}$} & \textbf{51.1$_{\pm1.9}$} & \textbf{60.5$_{\pm1.9}$} & \underline{51.6$_{\pm1.6}$} & \underline{39.4$_{\pm2.0}$} & \underline{53.0$_{\pm3.0}$} & \underline{48.5$_{\pm3.3}$} & \underline{35.9$_{\pm3.5}$} \\
+ & OT-CFM & \textbf{79.2} & \textbf{77.4} & \textbf{67.1} & \textbf{69.5} & \textbf{61.9} & \textbf{51.1} & \textbf{60.5} & \underline{51.6} & \underline{39.4} & \underline{53.0} & \underline{48.5} & \underline{35.9} \\
  & MFLVC (CVPR22) & 60.0 & 67.4 & 52.7 & 50.0 & 54.9 & 41.3 & 36.2 & 36.1 & 23.7 & 40.8 & 31.8 & 22.5 \\
  & GCFAggMVC (CVPR23) & 78.2 & \underline{74.9} & \underline{65.3} & 58.3 & 49.5 & 38.1 & 48.0 & 29.9 & 21.3 & 39.0 & 20.9 & 13.1 \\
  & MRG-UMC (TNNLS25) & \underline{78.5} & 74.6 & 63.8 & \underline{63.2} & 53.3 & 41.6 & 45.2 & 33.0 & 22.9 & 33.2 & 21.3 & 12.1 \\
@@ -623,7 +622,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 54.3 & \underline{60.1} & \underline{44.0} & \underline{59.3} & \textbf{61.3} & \textbf{46.3} & \textbf{55.7} & \textbf{61.7} & \textbf{46.7} \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{Handwritten}}
- & OT-CFM & \underline{94.1$_{\pm0.7}$} & 88.5$_{\pm1.0}$ & \underline{87.3$_{\pm1.5}$} & \underline{74.6$_{\pm0.5}$} & 60.8$_{\pm0.9}$ & \underline{57.7$_{\pm1.1}$} & \textbf{61.6$_{\pm0.4}$} & \underline{41.8$_{\pm0.4}$} & \textbf{38.0$_{\pm0.5}$} & \underline{45.6$_{\pm0.3}$} & \underline{25.3$_{\pm0.3}$} & \underline{21.1$_{\pm0.3}$} \\
+ & OT-CFM & \underline{94.1} & 88.5 & \underline{87.3} & \underline{74.6} & 60.8 & \underline{57.7} & \textbf{61.6} & \underline{41.8} & \textbf{38.0} & \underline{45.6} & \underline{25.3} & \underline{21.1} \\
  & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 74.2 & 58.9 & 55.4 & \underline{60.2} & 39.1 & \underline{34.5} & 44.2 & 20.5 & 16.1 \\
  & GCFAggMVC (CVPR23) & 80.5 & 78.3 & 69.6 & 69.3 & 52.5 & 47.9 & 52.9 & 30.2 & 25.3 & 39.1 & 15.9 & 11.9 \\
  & MRG-UMC (TNNLS25) & 93.8 & \underline{88.9} & 87.3 & \textbf{80.8} & \underline{65.0} & \textbf{61.1} & 57.2 & \textbf{48.7} & 31.3 & \textbf{50.7} & \textbf{38.2} & \textbf{25.7} \\
@@ -634,7 +633,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 67.5 & 47.8 & 44.9 & 52.8 & 29.6 & 25.6 & 36.7 & 13.7 & 10.3 \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{NUS-WIDE}}
- & OT-CFM & \textbf{19.6$_{\pm0.6}$} & 16.0$_{\pm0.9}$ & 5.5$_{\pm1.2}$ & \textbf{17.8$_{\pm0.3}$} & 15.9$_{\pm2.0}$ & \textbf{5.2$_{\pm0.5}$} & \textbf{15.9$_{\pm0.7}$} & 12.2$_{\pm2.5}$ & \textbf{3.2$_{\pm0.9}$} & \textbf{14.1$_{\pm0.3}$} & 9.5$_{\pm1.9}$ & 1.7$_{\pm0.6}$ \\
+ & OT-CFM & \textbf{19.6} & 16.0 & 5.5 & \textbf{17.8} & 15.9 & \textbf{5.2} & \textbf{15.9} & 12.2 & \textbf{3.2} & \textbf{14.1} & 9.5 & 1.7 \\
  & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.1 & \underline{18.6} & 4.4 & 13.0 & 15.3 & \underline{3.2} & 11.2 & 11.7 & 1.7 \\
  & GCFAggMVC (CVPR23) & 17.6 & \textbf{23.2} & \textbf{6.9} & 14.3 & 18.2 & 4.3 & 13.5 & \textbf{15.3} & 3.2 & 11.0 & 11.4 & 1.6 \\
  & MRG-UMC (TNNLS25) & \underline{17.8} & 19.1 & 4.8 & \underline{15.2} & 15.2 & 3.3 & 13.3 & 13.9 & 2.2 & \underline{12.4} & 12.0 & 1.6 \\
@@ -651,7 +650,6 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
 \vskip -0.1in
 \end{table*}
 
-\textit{Note: A=ACC(\%), N=NMI(\%), R=ARI(\%)}
 
 
 
