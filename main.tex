@@ -132,18 +132,15 @@ Most MVC algorithms assume a strict one-to-one correspondence across views. When
 % \section{Preliminaries on Flow Matching for Multi-View Clustering}\label{preliminaries}
 % Preliminaries moved to Appendix~\ref{app:flow_matching}
 
-\section{Optimal Transport–Guided Flow Matching for Incomplete and
-Unaligned Multi-View Clustering (OPTION)}\label{method}
+\section{Proposed Method}\label{method}
 
-\textbf{Preliminaries.} Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} learns a deterministic continuous normalizing flow (CNF) by regressing a vector field $v_\theta(\mathbf{z}_t, t)$ that transports samples from noise $p_0$ to data $p_1$ via ODE integration. Unlike diffusion models requiring hundreds of iterative steps, FM enables efficient few-step generation (see Appendix~\ref{app:flow_matching} for details).
+% \textbf{Preliminaries.} Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} learns a deterministic continuous normalizing flow (CNF) by regressing a vector field $v_\theta(\mathbf{z}_t, t)$ that transports samples from noise $p_0$ to data $p_1$ via ODE integration. Unlike diffusion models requiring hundreds of iterative steps, FM enables efficient few-step generation (see Appendix~\ref{app:flow_matching} for details).
 
-\subsection{Problem Formulation}\label{problem-formulation}
+\subsection{Problem Formulation and Framework Overview}\label{problem-formulation}
 
 Consider a multi-view dataset $\mathcal{X} = \{ \mathbf{X}^{(v)} \}_{v=1}^V$ with $V$ views. A binary mask $\mathbf{M} \in \{0,1\}^{N \times V}$ indicates view availability (\textbf{Incomplete MVC}), and cross-view sample correspondences may be unknown (\textbf{Unaligned MVC}). Our goal is to jointly: (1) impute missing views, (2) align cross-view geometric structures without explicit correspondences, and (3) discover cluster assignments---all within a unified end-to-end framework.
 
-\subsection{Framework Overview}\label{framework-overview}
-
-OPTION adopts a \textit{unified generation-alignment-clustering} paradigm with three core components: (1) \textbf{Latent Embedding} projects heterogeneous views into a shared low-dimensional space via view-specific encoder-decoders; (2) \textbf{Gromov-Wasserstein Alignment} enforces cross-view geometric consistency without sample correspondences; (3) \textbf{Conditional Flow Matching} enables efficient missing-view imputation with only 10 ODE steps. Figure~\ref{fig:overview} illustrates the pipeline.
+To achieve this, OPTION adopts a \textit{unified generation-alignment-clustering} paradigm with three core components: (1) \textbf{Latent Embedding} projects heterogeneous views into a shared low-dimensional space via view-specific encoder-decoders; (2) \textbf{Gromov-Wasserstein Alignment} enforces cross-view geometric consistency without sample correspondences; (3) \textbf{Conditional Flow Matching} enables efficient missing-view imputation with only 10 ODE steps. Figure~\ref{fig:overview} illustrates the pipeline.
 
 \begin{figure*}[t]
     \centering
@@ -158,34 +155,39 @@ To address the high dimensionality and heterogeneity of multi-view data, we proj
 
 \subsection{Gromov-Wasserstein Structural Alignment}\label{gw-vector-field}
 
-In unaligned scenarios, point-wise alignment is invalid since sample correspondences are unknown. Instead, we align the \textit{geometric structure} across views using the Gromov-Wasserstein (GW) distance, which compares distributions through their internal pairwise relationships rather than point correspondences.
+\textbf{Motivation.} A central challenge in unaligned multi-view clustering is that the $i$-th sample in view $v$ does not correspond to the $i$-th sample in view $u$. Consequently, conventional alignment strategies---such as contrastive learning or direct feature averaging---are fundamentally inapplicable, as they require explicit sample correspondences. To overcome this limitation, we introduce a \textit{structural alignment} mechanism based on the Gromov-Wasserstein (GW) distance. Unlike standard Wasserstein distance that measures point-to-point transport cost, GW compares two distributions by examining the \textit{preservation of pairwise relationships}: if two samples are close in one view, their counterparts (under an optimal coupling) should also be close in another view. This relational perspective enables cross-view alignment without knowing which samples correspond.
 
-\textbf{Kernel Matrix Construction.} For each view $v$, we compute an RBF kernel matrix $\mathbf{K}^{(v)} \in \mathbb{R}^{B \times B}$ within a mini-batch:
+\textbf{Kernel Matrix Construction.} To capture the geometric structure of each view, we construct a pairwise similarity matrix. For each view $v$, we compute an RBF (Radial Basis Function) kernel matrix $\mathbf{K}^{(v)} \in \mathbb{R}^{B \times B}$ within a mini-batch of size $B$:
 \[
 K_{ij}^{(v)} = \exp\left(-\gamma \| \mathbf{z}_i^{(v)} - \mathbf{z}_j^{(v)} \|^2\right)
 \]
+where $\gamma > 0$ is a bandwidth parameter. The entry $K_{ij}^{(v)}$ quantifies the similarity between the $i$-th and $j$-th samples within view $v$, encoding the local manifold geometry. This kernel formulation is robust to feature scale variations across heterogeneous views.
 
-\textbf{Structural Alignment Loss.} The GW loss aligns the pairwise relationship structures across view pairs:
+\textbf{Structural Alignment Loss.} The core insight is that if two views capture the same underlying cluster structure, their kernel matrices should exhibit similar patterns---even when sample indices are shuffled. We formalize this via the GW-inspired loss:
 \[
 \mathcal{L}_{GW} = \frac{2}{V(V-1)} \sum_{v < u} \| \mathbf{K}^{(v)} - \mathbf{K}^{(u)} \|_F^2
 \]
-This formulation encourages geometric consistency across views \textit{without requiring sample correspondences}. Batch-wise computation reduces complexity from $O(N^3)$ to $O(B^2)$ per batch, enabling scalable training.
+This loss penalizes discrepancies between the pairwise relationship structures across all view pairs. Intuitively, minimizing $\mathcal{L}_{GW}$ encourages the encoder to learn representations such that the \textit{intra-view geometric structure} becomes consistent across views, thereby achieving implicit alignment without explicit correspondences. Importantly, this batch-wise formulation reduces computational complexity from $O(N^3)$ (full GW optimization) to $O(B^2)$ per mini-batch, making it scalable for large datasets.
 
 \subsection{Conditional Flow Matching for Imputation}\label{conditional-flow}
 
-We formulate missing view imputation as learning a conditional vector field $v_\theta(\mathbf{z}_t, t, \mathbf{c})$ that transports Gaussian noise to the data manifold. Unlike diffusion models requiring $T=100\sim1000$ steps, our flow-based approach enables deterministic generation with only 10 ODE steps.
+\textbf{Motivation.} Missing view imputation is essential for incomplete multi-view clustering, as downstream fusion and clustering require complete representations. While diffusion models have shown strong generative capabilities, their iterative denoising process (typically $T=100\sim1000$ steps) incurs prohibitive latency. Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} offers an efficient alternative by learning a \textit{deterministic} continuous normalizing flow (CNF) that directly transports samples from a simple prior to the data distribution. The key advantage is that FM enables few-step generation (e.g., 10 steps) while maintaining high sample quality, making it ideal for real-time MVC applications.
 
-\textbf{Conditioning Strategy.} The conditioning $\mathbf{c}$ differs based on alignment:
+\textbf{Flow Matching Formulation.} FM learns a time-dependent vector field $v_\theta(\mathbf{z}_t, t)$ that defines an ordinary differential equation (ODE): $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t)$. By integrating this ODE from $t=0$ to $t=1$, samples are transported from noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ to data $\mathbf{z}_1 \sim p_{data}$. Following \cite{lipmanFlowMatchingGenerative2023a}, we adopt optimal transport (OT) paths, which yield straight trajectories $\mathbf{z}_t = (1-t)\mathbf{z}_0 + t\mathbf{z}_1$. The target vector field along this path is simply $u_t = \mathbf{z}_1 - \mathbf{z}_0$, and the network is trained to regress this target.
+
+\textbf{Conditional Generation.} For missing view imputation, we extend FM to a \textit{conditional} setting where generation is guided by available semantic information. We learn a conditional vector field $v_\theta(\mathbf{z}_t, t, \mathbf{c})$ where $\mathbf{c}$ provides context about the target sample. The conditioning strategy differs based on the alignment scenario:
 \begin{itemize}
-    \item \textbf{Aligned (IMVC):} Consensus representation $\mathbf{c}_i = \frac{1}{|\mathcal{V}_{avail}^{(i)}|} \sum_{v \in \mathcal{V}_{avail}^{(i)}} \mathbf{z}_i^{(v)}$.
-    \item \textbf{Unaligned (UMVC):} Cluster centroid $\mathbf{c}_i^{(v)} = \boldsymbol{\mu}_{k^*}$ where $k^* = \argmax_k q_{ik}^{(v)}$ and $q_{ik}^{(v)}$ is the soft assignment via cosine similarity. Each view operates \textit{independently}---cross-view alignment is achieved solely through $\mathcal{L}_{GW}$.
+    \item \textbf{Aligned (IMVC):} When sample correspondences are known, we use the consensus representation $\mathbf{c}_i = \frac{1}{|\mathcal{V}_{avail}^{(i)}|} \sum_{v \in \mathcal{V}_{avail}^{(i)}} \mathbf{z}_i^{(v)}$ aggregated from available views. This provides direct semantic guidance for imputing the missing view.
+    \item \textbf{Unaligned (UMVC):} When correspondences are unknown, cross-sample averaging is invalid. Instead, we condition on the cluster centroid $\mathbf{c}_i^{(v)} = \boldsymbol{\mu}_{k^*}$ where $k^* = \argmax_k q_{ik}^{(v)}$ is determined by soft assignment via cosine similarity. This ensures semantically coherent generation while each view operates \textit{independently}---cross-view consistency is enforced solely through $\mathcal{L}_{GW}$.
 \end{itemize}
 
-\textbf{Flow Matching Loss.} We adopt optimal transport-guided flow matching with straight trajectories $\mathbf{z}_t = (1-t)\mathbf{z}_0 + t\mathbf{z}_1$:
+\textbf{Flow Matching Loss.} The training objective minimizes the discrepancy between the predicted and target vector fields:
 \[
 \mathcal{L}_{CFM} = \mathbb{E}_{t, \mathbf{z}_0, \mathbf{z}_1, \mathbf{c}} \left[ \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - \mathbf{z}_0) \|^2 \right]
 \]
-This enables efficient 10-step ODE integration at inference time.
+where $t \sim \mathcal{U}[0,1]$, $\mathbf{z}_0 \sim \mathcal{N}(0, I)$, and $\mathbf{z}_1$ is the encoded latent of an observed view.
+
+\textbf{Inference.} At test time, to impute a missing view for sample $i$, we: (1) sample initial noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$; (2) construct conditioning $\mathbf{c}$ based on the scenario; (3) integrate the ODE $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t, \mathbf{c})$ using Euler method with 10 steps. The resulting $\mathbf{z}_1$ serves as the imputed latent representation, enabling complete multi-view fusion and clustering.
 
 \subsection{Soft Clustering}\label{clustering}
 
@@ -229,7 +231,7 @@ $\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
 
 \textbf{Training Procedure.} We adopt a three-phase training strategy: (1) \textit{Warm-up I}: train encoder-decoder with $\mathcal{L}_{Recon}$ to establish a stable latent manifold; (2) \textit{Warm-up II}: initialize centroids via K-Means and apply single-view DEC loss to develop cluster-separable representations; (3) \textit{Joint Training}: end-to-end optimization with $\mathcal{L}_{Total}$, periodically refining centroids via K-Means.
 
-\textbf{Implementation.} Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), Euler ODE solver with 10 steps. The complete process is in Algorithm~\ref{alg:ot_cfm}.
+\textbf{Implementation.} Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), Euler ODE solver with 10 steps. The complete process is in Algorithm~\ref{alg:option}.
 
 \begin{algorithm}[tb]
   \caption{End-to-End Training for OPTION}
@@ -281,7 +283,7 @@ In this section, we evaluate the performance of OPTION on multiple benchmark dat
 \subsection{Experimental Setup}
 \label{subsec:setup}
 
-\textbf{Datasets.} We conduct experiments on six widely used multi-view benchmarks: \texttt{Scene-15}, \texttt{LandUse-21}, \texttt{NoisyMNIST}, \texttt{Caltech101-20}, \texttt{Reuters}, and \texttt{Fashion}. These datasets cover various domains including images, text, and digits, with sample sizes ranging from 2K to 30K.
+\textbf{Datasets.} We conduct experiments on five widely used multi-view benchmarks: Bdgp, Coil20, CUB, Handwritten and Nuswide.
 
 \textbf{Baselines.} We compare OPTION with three categories of SOTA methods:
 (1) \textbf{Traditional MVC:} AMGL, PMSC;
