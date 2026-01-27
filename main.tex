@@ -151,7 +151,7 @@ To achieve this, OPTION adopts a \textit{unified generation-alignment-clustering
 
 \subsection{Latent Space Construction}\label{latent-space}
 
-To address the high dimensionality and heterogeneity of multi-view data, we project all views into a unified low-dimensional latent space. For each view $v$, a neural encoder $f_{\phi_v}: \mathbb{R}^{d_v} \to \mathbb{R}^{d_z}$ maps the observation $\mathbf{x}_i^{(v)}$ to a latent representation $\mathbf{z}_i^{(v)} = f_{\phi_v}(\mathbf{x}_i^{(v)})$. Symmetric decoders $g_{\psi_v}: \mathbb{R}^{d_z} \to \mathbb{R}^{d_v}$ reconstruct the original views, providing a reconstruction loss $\mathcal{L}_{Recon} = \sum_v \|\mathbf{x}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^2$ that regularizes the latent space. This design reduces computational complexity from $O(d_v^2)$ to $O(d_z^2)$ for flow matching operations while enabling meaningful cross-view comparisons in the shared space $\mathbb{R}^{d_z}$.
+To address the high dimensionality and heterogeneity of multi-view data, we project all views into a unified low-dimensional latent space. For each view $v$, a neural encoder $f_{\phi_v}: \mathbb{R}^{d_v} \to \mathbb{R}^{d_z}$ maps the observation $\mathbf{x}_i^{(v)}$ to a latent representation $\mathbf{z}_i^{(v)} = f_{\phi_v}(\mathbf{x}_i^{(v)})$. Symmetric decoders $g_{\psi_v}: \mathbb{R}^{d_z} \to \mathbb{R}^{d_v}$ reconstruct the original views, providing a reconstruction loss $\mathcal{L}_{rec} = \sum_v \|\mathbf{x}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^2$ that regularizes the latent space. This design reduces computational complexity from $O(d_v^2)$ to $O(d_z^2)$ for flow matching operations while enabling meaningful cross-view comparisons in the shared space $\mathbb{R}^{d_z}$.
 
 \subsection{Gromov-Wasserstein Structural Alignment}\label{gw-vector-field}
 
@@ -195,15 +195,15 @@ We employ soft cluster assignments based on cosine similarity between latent rep
 \[
 q_{ik} = \frac{\exp(\tilde{\mathbf{z}}_i^\top \tilde{\boldsymbol{\mu}}_k / \tau)}{\sum_{j=1}^{K} \exp(\tilde{\mathbf{z}}_i^\top \tilde{\boldsymbol{\mu}}_j / \tau)}
 \]
-where $\tilde{\mathbf{z}}_i$ and $\tilde{\boldsymbol{\mu}}_k$ are $\ell_2$-normalized. Following the DEC paradigm \cite{xieUnsupervisedDeepEmbedding2016}, we define a sharpened target distribution $P$ and minimize $\mathcal{L}_{Cluster} = KL(P \| Q)$ to encourage high-confidence assignments.
+where $\tilde{\mathbf{z}}_i$ and $\tilde{\boldsymbol{\mu}}_k$ are $\ell_2$-normalized. Following the DEC paradigm \cite{xieUnsupervisedDeepEmbedding2016}, we define a sharpened target distribution $P$ and minimize $\mathcal{L}_{clu} = KL(P \| Q)$ to encourage high-confidence assignments.
 
 \subsection{Overall Objective}\label{overall-objective}
 
 The total objective integrates five loss terms:
 \[
-\mathcal{L}_{Total} = \mathcal{L}_{CFM} + \lambda_{gw} \mathcal{L}_{GW} + \lambda_{c} \mathcal{L}_{Cluster} + \lambda_{r} \mathcal{L}_{Recon} + \lambda_{con} \mathcal{L}_{Contrastive}
+\mathcal{L}_{tot} = \mathcal{L}_{CFM} + \lambda_g \mathcal{L}_{GW} + \lambda_c \mathcal{L}_{clu} + \lambda_r \mathcal{L}_{rec} + \lambda_t \mathcal{L}_{con}
 \]
-where $\mathcal{L}_{CFM}$ (flow matching), $\mathcal{L}_{GW}$ (structural alignment), and $\mathcal{L}_{Cluster}$ (soft clustering) are defined in previous sections; $\mathcal{L}_{Recon} = \sum_v \|\mathbf{X}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^2$ preserves view-specific information; and $\mathcal{L}_{Contrastive}$ (InfoNCE) enhances cross-view consistency for \textbf{aligned data only} (set $\lambda_{con}=0$ for UMVC). Default hyperparameters: $\lambda_{gw}=0.2$, $\lambda_c=1.0$, $\lambda_r=0.5$, $\lambda_{con}=0.3$ (aligned) or $0$ (unaligned). Table~\ref{tab:loss_config} summarizes the configurations.
+where $\mathcal{L}_{CFM}$ (flow matching), $\mathcal{L}_{GW}$ (structural alignment), and $\mathcal{L}_{clu}$ (soft clustering) are defined in previous sections; $\mathcal{L}_{rec} = \sum_v \|\mathbf{X}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^2$ preserves view-specific information; and $\mathcal{L}_{con}$ (InfoNCE) enhances cross-view consistency for \textbf{aligned data only} (set $\lambda_t=0$ for UMVC). Default hyperparameters: $\lambda_g=0.2$, $\lambda_c=1.0$, $\lambda_r=0.5$, $\lambda_t=0.3$ (aligned) or $0$ (unaligned). Table~\ref{tab:loss_config} summarizes the configurations.
 
 \begin{table}[t]
 \centering
@@ -217,9 +217,9 @@ where $\mathcal{L}_{CFM}$ (flow matching), $\mathcal{L}_{GW}$ (structural alignm
 \textbf{Flow Conditioning} & Consensus $\mathbf{z}^{(c)}$ & Centroid $\boldsymbol{\mu}_{k^*}$ \\
 $\mathcal{L}_{CFM}$ (Generative) & \checkmark & \checkmark \\
 $\mathcal{L}_{GW}$ & \checkmark & \checkmark \\
-$\mathcal{L}_{Cluster}$ & \checkmark & \checkmark \\
-$\mathcal{L}_{Recon}$ & \checkmark & \checkmark \\
-$\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
+$\mathcal{L}_{clu}$ & \checkmark & \checkmark \\
+$\mathcal{L}_{rec}$ & \checkmark & \checkmark \\
+$\mathcal{L}_{con}$ & \checkmark & $\times$ \\
 \bottomrule
 \end{tabular}%
 }
@@ -229,7 +229,7 @@ $\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
 
 \subsection{Optimization}\label{optimization}
 
-\textbf{Training Procedure.} We adopt a three-phase training strategy: (1) \textit{Warm-up I}: train encoder-decoder with $\mathcal{L}_{Recon}$ to establish a stable latent manifold; (2) \textit{Warm-up II}: initialize centroids via K-Means and apply single-view DEC loss to develop cluster-separable representations; (3) \textit{Joint Training}: end-to-end optimization with $\mathcal{L}_{Total}$, periodically refining centroids via K-Means.
+\textbf{Training Procedure.} We adopt a three-phase training strategy: (1) \textit{Warm-up I}: train encoder-decoder with $\mathcal{L}_{rec}$ to establish a stable latent manifold; (2) \textit{Warm-up II}: initialize centroids via K-Means and apply single-view DEC loss to develop cluster-separable representations; (3) \textit{Joint Training}: end-to-end optimization with $\mathcal{L}_{tot}$, periodically refining centroids via K-Means.
 
 \textbf{Implementation.} Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), Euler ODE solver with 10 steps. The complete process is in Algorithm~\ref{alg:option}.
 
@@ -237,7 +237,7 @@ $\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
   \caption{End-to-End Training for OPTION}
   \label{alg:option}
   \begin{algorithmic}
-    \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_{gw}, \lambda_{c}, \lambda_{r}, \lambda_{con}$, Alignment flag \texttt{is\_aligned}.
+    \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_g, \lambda_c, \lambda_r, \lambda_t$, Alignment flag \texttt{is\_aligned}.
     \STATE {\bfseries Initialize:} Encoder-decoder parameters $\phi$, Vector field parameters $\theta$, Cluster centroids $\mathbf{M}$ via K-Means on initial embeddings.
     \FOR{epoch $= 1$ to $E$}
     \FOR{each mini-batch $\mathcal{B} \subset \mathcal{X}$}
@@ -256,8 +256,8 @@ $\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
         \STATE Sample noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ and time $t \sim \mathcal{U}[0,1]$.
         \STATE Compute CFM Loss: $\mathcal{L}_{CFM} = \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - (1-\sigma_{min})\mathbf{z}_0) \|^2$.
         \STATE Compute GW Alignment Loss $\mathcal{L}_{GW}$ on encoded latents.
-        \STATE Compute Clustering Loss $\mathcal{L}_{Cluster} = KL(P_{\mathcal{B}} \| Q_{\mathcal{B}})$.
-        \STATE Compute $\mathcal{L}_{Recon}$; compute $\mathcal{L}_{Contrastive}$ only if \texttt{is\_aligned}.
+        \STATE Compute Clustering Loss $\mathcal{L}_{clu} = KL(P_{\mathcal{B}} \| Q_{\mathcal{B}})$.
+        \STATE Compute $\mathcal{L}_{rec}$; compute $\mathcal{L}_{con}$ only if \texttt{is\_aligned}.
         \STATE Update all parameters via Adam with gradient clipping.
     \ENDFOR
     \IF{epoch mod $T_{update} = 0$}
