@@ -91,8 +91,8 @@ To address these challenges, this paper presents a novel method, \textbf{OP}tima
 %Specifically, OPTION employs a conditional flow matching mechanism to learn deterministic transport paths for missing view imputation, ensuring high-fidelity recovery and stable manifold learning. Simultaneously, to enable alignment-free fusion, we introduce a Gromov-Wasserstein (GW) loss—a structural relaxation of OT—that aligns intra-view geometric structures in the latent space, complemented by an optional contrastive term for aligned settings. Extensive experiments demonstrate that OPTION achieves superior performance across ideal, incomplete, and unaligned scenarios, along with high inference efficiency.
 Specifically, OPTION employs conditional flow matching to learn deterministic transport paths for missing-view imputation, enabling stable manifold-preserving recovery and more discriminative representations. To achieve alignment-free fusion, we introduce a Gromov-Wasserstein loss—a structural relaxation of optimal transport—that aligns intra-view geometric structures in the latent space. Furthermore, an optional contrastive regularization is incorporated to enhance cross-view consistency specifically for aligned settings. Extensive experiments demonstrate that OPTION outperforms state-of-the-art methods across ideal, incomplete, and unaligned scenarios. 
 %Multi-view clustering in real-world applications often suffers from missing views and structural misalignment, leading to suboptimal information utilization and degraded clustering performance. To address these challenges, we propose a unified framework that integrates a flow matching–based generation strategy with structural alignment. Specifically, we design an optimal transport coupled flow matching mechanism that maps view-specific latent representations to a structurally aligned consensus space, enabling efficient completion of missing views and alignment-free multi-view fusion. In addition, a Gromov–Wasserstein–based structural coupling loss aligns intra-view geometric structures in the latent space without requiring explicit sample correspondences, making the framework naturally suitable for unaligned data. Moreover, an optional contrastive regularization term is introduced for aligned settings where sample correspondences are available, further extending the applicability of the proposed method. This paper presents a structure-aware Flow Matching framework for multi-view clustering, designed to simultaneously perform missing information generation and alignment-free multi-view fusion in a unified and deterministic manner. We propose a unified framework that integrates missing view generation and multi-view representation learning via flow matching, enabling incomplete views to be effectively mapped into a shared consensus space. To handle unaligned data, a Gromov–Wasserstein–based structural coupling loss aligns intra-view geometric structures without requiring sample correspondences. Cluster assignments are obtained via a cosine similarity–based soft clustering mechanism, with an optional contrastive regularization for aligned settings. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that our method achieves state-of-the-art clustering performance while significantly improving efficiency.
-%Multi-view clustering (MVC) confronts dual challenges in real-world deployments: data incompleteness (missing views) and structural misalignment (unaligned samples). While Diffusion Models (DMs) have shown promise in generative imputation, their stochastic nature and iterative sampling impose high computational latency, and they inherently lack mechanisms to handle unaligned cross-view structures. We propose \textbf{Optimal Transport Coupled Flow Matching (OT-CFM)}, a unified framework that leverages the deterministic nature of continuous normalizing flows and the geometric properties of Optimal Transport. Unlike traditional methods that require explicit alignment steps or stochastic multistep generation, OT-CFM learns a cross-view flow that optimally transports view-specific latent representations toward a structurally aligned consensus centroid. This process enables deterministic, efficient view completion and alignment-free fusion simultaneously. 
-%Specifically, we introduce: (1) a cross-view flow matching objective that learns transformations from each view to the consensus space; (2) a Gromov-Wasserstein structural coupling loss computed on encoded representations that aligns intra-view geometry \textit{without requiring sample correspondences}, making it suitable for unaligned scenarios; (3) a cosine similarity-based soft clustering mechanism; and (4) an optional contrastive regularization for aligned settings where sample correspondences are known. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that OT-CFM achieves competitive performance with state-of-the-art methods while offering significantly faster inference.
+%Multi-view clustering (MVC) confronts dual challenges in real-world deployments: data incompleteness (missing views) and structural misalignment (unaligned samples). While Diffusion Models (DMs) have shown promise in generative imputation, their stochastic nature and iterative sampling impose high computational latency, and they inherently lack mechanisms to handle unaligned cross-view structures. We propose \textbf{OPTION (OPtimal Transport–guIded flOw matchINg)}, a unified framework that leverages the deterministic nature of continuous normalizing flows and the geometric properties of Optimal Transport. Unlike traditional methods that require explicit alignment steps or stochastic multistep generation, OPTION learns a cross-view flow that optimally transports view-specific latent representations toward a structurally aligned consensus centroid. This process enables deterministic, efficient view completion and alignment-free fusion simultaneously. 
+% Specifically, we introduce: (1) a cross-view flow matching objective that learns transformations from each view to the consensus space; (2) a Gromov-Wasserstein structural coupling loss computed on encoded representations that aligns intra-view geometry \textit{without requiring sample correspondences}, making it suitable for unaligned scenarios; (3) a cosine similarity-based soft clustering mechanism; and (4) an optional contrastive regularization for aligned settings where sample correspondences are known. Experiments on benchmark datasets with varying degrees of missingness and misalignment demonstrate that OPTION achieves competitive performance with state-of-the-art methods while offering significantly faster inference.
 \end{abstract}
 
 \section{Introduction}\label{introduction}
@@ -112,10 +112,10 @@ To address the aforementioned limitations, we propose \textbf{OPTION} (\textbf{O
 
 In summary, our contributions are as follows:
 \begin{itemize}
-    \item We propose OT-CFM, a unified framework that addresses both incomplete and unaligned multi-view clustering through flow matching, achieving deterministic inference with significantly lower latency than diffusion-based methods.
+    \item We propose OPTION, a unified framework that addresses both incomplete and unaligned multi-view clustering through flow matching, achieving deterministic inference with significantly lower latency than diffusion-based methods.
     \item We develop a Gromov-Wasserstein structural coupling loss that enforces cross-view geometric consistency \textit{without requiring sample correspondences}, enabling true alignment-free multi-view learning.
     \item We introduce a modular architecture that adaptively activates contrastive learning for aligned data while relying on GW-based structural alignment for unaligned scenarios.
-    \item Extensive experiments on benchmark datasets demonstrate that OT-CFM achieves competitive or superior performance compared to state-of-the-art methods while offering 10-100$\times$ faster inference.
+    \item Extensive experiments on benchmark datasets demonstrate that OPTION achieves competitive or superior performance compared to state-of-the-art methods while offering 10-100$\times$ faster inference.
 \end{itemize}
 
 \section{Related Work}\label{related-work}
@@ -127,7 +127,7 @@ Handling missing views is a pivotal challenge in MVC. Early approaches relied on
 Most MVC algorithms assume a strict one-to-one correspondence across views. When this assumption is violated (i.e., unaligned MVC), performance degrades significantly. Existing solutions usually formulate alignment as a permutation learning problem. PVC \cite{huangPartiallyViewalignedClustering2020a} and its successors employ differentiable matching networks to infer correspondences. Recent works like MRG-UMC \cite{xinMultilevelReliableGuidance2025} and CANDY \cite{guoRobustContrastiveMultiview2024a} introduce multi-level guidance and robust contrastive learning to handle noisy or unpaired data. However, these methods often involve solving the assignment problem (e.g., via the Hungarian algorithm), which scales poorly ($O(N^3)$) with dataset size. Furthermore, they typically treat alignment and clustering as separate stages or alternating objectives, lacking a unified framework to handle structural misalignment implicitly.
 
 % \textbf{Flow Matching and Optimal Transport.} 
-% Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} has emerged as a simulation-free alternative to diffusion models, learning a deterministic Continuous Normalizing Flow (CNF) by regressing a target vector field. Rectified Flow \cite{liu2023rectifiedflow} and OT-CFM \cite{tong2024otcfm} further optimize the transport path to be straight, enabling fast sampling with few-step ODE solvers. The connection between FM and Optimal Transport (OT) provides a geometric perspective on distribution alignment. While OT has been applied to domain adaptation, its integration with Flow Matching for unsupervised multi-view clustering—specifically to address incompleteness and misalignment simultaneously—remains unexplored. Our work bridges this gap by leveraging OT-guided flows for efficient imputation and alignment-free fusion.
+% Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} has emerged as a simulation-free alternative to diffusion models, learning a deterministic Continuous Normalizing Flow (CNF) by regressing a target vector field. Rectified Flow \cite{liu2023rectifiedflow} and related works further optimize the transport path to be straight, enabling fast sampling with few-step ODE solvers. The connection between FM and Optimal Transport (OT) provides a geometric perspective on distribution alignment. While OT has been applied to domain adaptation, its integration with Flow Matching for unsupervised multi-view clustering—specifically to address incompleteness and misalignment simultaneously—remains unexplored. Our work bridges this gap by leveraging OT-guided flows for efficient imputation and alignment-free fusion.
 
 % \section{Preliminaries on Flow Matching for Multi-View Clustering}\label{preliminaries}
 % Preliminaries moved to Appendix~\ref{app:flow_matching}
@@ -148,7 +148,7 @@ OPTION adopts a \textit{unified generation-alignment-clustering} paradigm with t
 \begin{figure*}[t]
     \centering
     \includegraphics[width=0.9\textwidth]{overview.jpg}
-    \caption{Overview of the proposed OT-CFM framework. The architecture consists of view-specific encoders that project heterogeneous inputs into a unified latent space, a conditional flow matching module that learns optimal transport paths from noise to data conditioned on semantic anchors, and a Gromov-Wasserstein structural alignment mechanism that enforces cross-view geometric consistency without requiring sample correspondences.}
+    \caption{Overview of the proposed OPTION framework. The architecture consists of view-specific encoders that project heterogeneous inputs into a unified latent space, a conditional flow matching module that learns optimal transport paths from noise to data conditioned on semantic anchors, and a Gromov-Wasserstein structural alignment mechanism that enforces cross-view geometric consistency without requiring sample correspondences.}
     \label{fig:overview}
 \end{figure*}
 
@@ -181,7 +181,7 @@ We formulate missing view imputation as learning a conditional vector field $v_\
     \item \textbf{Unaligned (UMVC):} Cluster centroid $\mathbf{c}_i^{(v)} = \boldsymbol{\mu}_{k^*}$ where $k^* = \argmax_k q_{ik}^{(v)}$ and $q_{ik}^{(v)}$ is the soft assignment via cosine similarity. Each view operates \textit{independently}---cross-view alignment is achieved solely through $\mathcal{L}_{GW}$.
 \end{itemize}
 
-\textbf{Flow Matching Loss.} We adopt the OT-CFM formulation with straight trajectories $\mathbf{z}_t = (1-t)\mathbf{z}_0 + t\mathbf{z}_1$:
+\textbf{Flow Matching Loss.} We adopt optimal transport-guided flow matching with straight trajectories $\mathbf{z}_t = (1-t)\mathbf{z}_0 + t\mathbf{z}_1$:
 \[
 \mathcal{L}_{CFM} = \mathbb{E}_{t, \mathbf{z}_0, \mathbf{z}_1, \mathbf{c}} \left[ \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - \mathbf{z}_0) \|^2 \right]
 \]
@@ -232,8 +232,8 @@ $\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
 \textbf{Implementation.} Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), Euler ODE solver with 10 steps. The complete process is in Algorithm~\ref{alg:ot_cfm}.
 
 \begin{algorithm}[tb]
-  \caption{End-to-End Training for OT-CFM}
-  \label{alg:ot_cfm}
+  \caption{End-to-End Training for OPTION}
+  \label{alg:option}
   \begin{algorithmic}
     \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_{gw}, \lambda_{c}, \lambda_{r}, \lambda_{con}$, Alignment flag \texttt{is\_aligned}.
     \STATE {\bfseries Initialize:} Encoder-decoder parameters $\phi$, Vector field parameters $\theta$, Cluster centroids $\mathbf{M}$ via K-Means on initial embeddings.
@@ -269,10 +269,10 @@ $\mathcal{L}_{Contrastive}$ & \checkmark & $\times$ \\
 \section{Experiments}
 \label{sec:experiments}
 
-In this section, we evaluate the performance of OT-CFM on multiple benchmark datasets. We aim to answer the following research questions:
+In this section, we evaluate the performance of OPTION on multiple benchmark datasets. We aim to answer the following research questions:
 \begin{itemize}
-    \item \textbf{RQ1 ( Effectiveness):} How does OT-CFM compare against state-of-the-art methods on standard multi-view clustering tasks?
-    \item \textbf{RQ2 (Robustness):} Is OT-CFM robust to varying degrees of data missingness and misalignment?
+    \item \textbf{RQ1 ( Effectiveness):} How does OPTION compare against state-of-the-art methods on standard multi-view clustering tasks?
+    \item \textbf{RQ2 (Robustness):} Is OPTION robust to varying degrees of data missingness and misalignment?
     \item \textbf{RQ3 (Efficiency):} Does the flow matching paradigm offer significant speedup compared to diffusion-based baselines?
     \item \textbf{RQ4 (Components):} What is the contribution of each component (e.g., GW loss, cross-view flow, contrastive loss) to the final performance?
 \end{itemize}
@@ -283,12 +283,12 @@ In this section, we evaluate the performance of OT-CFM on multiple benchmark dat
 
 \textbf{Datasets.} We conduct experiments on six widely used multi-view benchmarks: \texttt{Scene-15}, \texttt{LandUse-21}, \texttt{NoisyMNIST}, \texttt{Caltech101-20}, \texttt{Reuters}, and \texttt{Fashion}. These datasets cover various domains including images, text, and digits, with sample sizes ranging from 2K to 30K.
 
-\textbf{Baselines.} We compare OT-CFM with three categories of SOTA methods:
+\textbf{Baselines.} We compare OPTION with three categories of SOTA methods:
 (1) \textbf{Traditional MVC:} AMGL, PMSC;
 (2) \textbf{Deep MVC (Aligned):} AE$^2$-Nets, SDMVC;
 (3) \textbf{Incomplete/Unaligned MVC:} COMPLETER \cite{linCOMPLETERIncompleteMultiview2021}, SURE \cite{yangRobustMultiViewClustering2023}, GCFAggMVC, and the diffusion-based DCG \cite{zhangIncompleteMultiviewClustering2025a}.
 
-\textbf{Implementation Details.} OT-CFM is implemented in PyTorch. We use an MLP-based encoder-decoder and a conditional flow matching network. The ODE solver uses the Euler method with $N=10$ steps. The hyperparameters $\lambda_{gw}$, $\lambda_{c}$, and $\lambda_{con}$ are tuned via grid search. All experiments are run on a single NVIDIA RTX 3090 GPU. Evaluation metrics include Accuracy (ACC), Normalized Mutual Information (NMI), and Adjusted Rand Index (ARI).
+\textbf{Implementation Details.} OPTION is implemented in PyTorch. We use an MLP-based encoder-decoder and a conditional flow matching network. The ODE solver uses the Euler method with $N=10$ steps. The hyperparameters $\lambda_{gw}$, $\lambda_{c}$, and $\lambda_{con}$ are tuned via grid search. All experiments are run on a single NVIDIA RTX 3090 GPU. Evaluation metrics include Accuracy (ACC), Normalized Mutual Information (NMI), and Adjusted Rand Index (ARI).
 
 % ----------------------------------------------------------------------
 \subsection{Main Clustering Results (RQ1)}
@@ -311,7 +311,7 @@ Metrics & ACC & NMI & ARI & ACC & NMI & ARI \\
 AMGL    & 65.2 & 62.1 & 58.4 & 78.5 & 75.2 & 70.1 \\
 SURE    & 72.5 & 75.8 & 68.9 & 85.2 & 82.1 & 79.5 \\
 DCG     & \underline{84.3} & \underline{86.5} & \underline{80.2} & \underline{96.5} & \underline{95.2} & \underline{94.8} \\
-OT-CFM (Ours) & \textbf{86.1} & \textbf{88.2} & \textbf{82.5} & \textbf{98.1} & \textbf{96.8} & \textbf{96.5} \\
+OPTION (Ours) & \textbf{86.1} & \textbf{88.2} & \textbf{82.5} & \textbf{98.1} & \textbf{96.8} & \textbf{96.5} \\
 \bottomrule
 \end{tabular}
 \end{sc}
@@ -320,13 +320,13 @@ OT-CFM (Ours) & \textbf{86.1} & \textbf{88.2} & \textbf{82.5} & \textbf{98.1} & 
 \vskip -0.1in
 \end{table*}
 
-\textbf{Observation:} OT-CFM consistently outperforms traditional and deep MVC baselines. Notably, it surpasses the diffusion-based method DCG by a significant margin on complex datasets like Caltech101, demonstrating the superiority of optimal transport-guided flow learning.
+\textbf{Observation:} OPTION consistently outperforms traditional and deep MVC baselines. Notably, it surpasses the diffusion-based method DCG by a significant margin on complex datasets like Caltech101, demonstrating the superiority of optimal transport-guided flow learning.
 
 % ----------------------------------------------------------------------
 \subsection{Robustness Analysis (RQ2)}
 \label{subsec:robustness}
 
-This section evaluates the core capability of OT-CFM: handling non-ideal data.
+This section evaluates the core capability of OPTION: handling non-ideal data.
 
 \subsubsection{Incomplete Multi-View Clustering}
 We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Table \ref{tab:robustness_incomplete} shows the clustering accuracy under varying missing rates.
@@ -345,7 +345,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{BDGP}}
- & OT-CFM & \textbf{50.5} & \underline{27.3} & \textbf{24.8} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{46.6} & \textbf{19.8} & \textbf{17.8} \\
+ & OPTION & \textbf{50.5} & \underline{27.3} & \textbf{24.8} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{46.6} & \textbf{19.8} & \textbf{17.8} \\
  & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 26.8 & 2.9 & 1.7 \\
  & SURE (TPAMI22) & 35.5 & 16.2 & 8.5 & 41.8 & 16.8 & 9.9 & 41.8 & 16.8 & 9.9 & 31.0 & 9.0 & 6.3 \\
  & DealMVC (CVPR23) & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.5 & 2.4 & 1.3 \\
@@ -357,7 +357,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 25.4 & 2.7 & 1.6 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{Coil20}}
- & OT-CFM & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{87.6} & \textbf{92.9} & \textbf{84.6} \\
+ & OPTION & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{87.6} & \textbf{92.9} & \textbf{84.6} \\
  & MFLVC (CVPR22) & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & \underline{48.3} & 63.3 & 35.1 \\
  & SURE (TPAMI22) & 75.2 & 86.0 & 69.0 & 70.2 & 85.0 & 67.1 & 70.2 & 85.0 & 67.1 & 41.5 & 58.4 & 27.4 \\
  & DealMVC (CVPR23) & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 34.6 & 55.9 & 19.3 \\
@@ -369,7 +369,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 41.0 & 60.4 & 29.1 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{CUB}}
- & OT-CFM & \textbf{78.6} & \textbf{77.5} & \textbf{66.4} & \textbf{79.6} & \textbf{76.3} & \textbf{65.4} & \textbf{79.3} & \textbf{77.8} & \textbf{67.5} & \textbf{73.4} & \textbf{69.9} & \textbf{57.0} \\
+ & OPTION & \textbf{78.6} & \textbf{77.5} & \textbf{66.4} & \textbf{79.6} & \textbf{76.3} & \textbf{65.4} & \textbf{79.3} & \textbf{77.8} & \textbf{67.5} & \textbf{73.4} & \textbf{69.9} & \textbf{57.0} \\
  & MFLVC (CVPR22) & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 22.3 & 13.1 & 4.9 \\
  & SURE (TPAMI22) & 70.7 & 61.9 & 52.3 & 75.7 & 67.1 & 56.3 & 75.7 & 67.1 & 56.3 & \underline{47.0} & \underline{49.9} & \underline{28.7} \\
  & DealMVC (CVPR23) & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 34.3 & 36.0 & 18.0 \\
@@ -381,7 +381,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 33.3 & 28.8 & 5.0 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{Handwritten}}
- & OT-CFM & \underline{94.1} & \underline{88.5} & \underline{87.3} & \underline{94.1} & \underline{88.5} & \underline{87.3} & \textbf{93.7} & \textbf{87.8} & \textbf{86.5} & \textbf{92.7} & \textbf{85.8} & \textbf{84.4} \\
+ & OPTION & \underline{94.1} & \underline{88.5} & \underline{87.3} & \underline{94.1} & \underline{88.5} & \underline{87.3} & \textbf{93.7} & \textbf{87.8} & \textbf{86.5} & \textbf{92.7} & \textbf{85.8} & \textbf{84.4} \\
  & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 84.0 & 82.2 & 76.0 & 85.3 & \underline{83.8} & \underline{78.5} & \underline{84.3} & \underline{81.8} & \underline{76.2} \\
  & SURE (TPAMI22) & 73.0 & 71.2 & 62.0 & 77.1 & 73.1 & 62.5 & 49.2 & 47.1 & 30.5 & 27.7 & 26.7 & 10.6 \\
  & DealMVC (CVPR23) & 80.2 & 77.4 & 69.2 & 80.2 & 77.4 & 69.2 & 69.4 & 72.2 & 57.2 & 31.2 & 27.3 & 11.9 \\
@@ -393,7 +393,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
  & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 80.5 & 74.9 & 70.0 & 63.4 & 57.4 & 44.3 & 37.4 & 32.2 & 15.1 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{NUS-WIDE}}
- & OT-CFM & \textbf{19.0} & 18.7 & 6.3 & \textbf{19.4} & 17.9 & 5.2 & \textbf{19.9} & 15.9 & \textbf{5.9} & \textbf{19.1} & \underline{17.3} & \textbf{6.5} \\
+ & OPTION & \textbf{19.0} & 18.7 & 6.3 & \textbf{19.4} & 17.9 & 5.2 & \textbf{19.9} & 15.9 & \textbf{5.9} & \textbf{19.1} & \underline{17.3} & \textbf{6.5} \\
  & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.6 & \underline{23.1} & 6.2 & \underline{15.2} & \textbf{21.5} & \underline{5.3} & \underline{14.9} & \textbf{19.7} & \underline{4.9} \\
  & SURE (TPAMI22) & 14.1 & 17.2 & 3.6 & 13.4 & 17.5 & 3.7 & 11.9 & 14.3 & 2.1 & 11.2 & 12.8 & 1.4 \\
  & DealMVC (CVPR23) & 16.4 & 20.8 & \underline{6.3} & 16.4 & 20.8 & \underline{6.3} & 12.2 & 7.7 & 0.4 & 10.2 & 10.0 & 0.7 \\
@@ -413,7 +413,7 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
 
 
 
-\textbf{Analysis:} As the missing rate increases, the performance of all methods drops. However, OT-CFM maintains high stability, degrading much slower than baselines. This confirms that our Cross-View Flow Matching effectively imputes missing semantics from available views.
+\textbf{Analysis:} As the missing rate increases, the performance of all methods drops. However, OPTION maintains high stability, degrading much slower than baselines. This confirms that our Cross-View Flow Matching effectively imputes missing semantics from available views.
 
 \subsubsection{Unaligned Multi-View Clustering}
 We simulate unaligned scenarios by randomly shuffling the sample indices of one view, with shuffling rates from $0\%$ to $100\%$. Table \ref{tab:robustness_unaligned} presents the clustering accuracy under varying unaligned rates.
@@ -432,7 +432,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{BDGP}}
- & OT-CFM & \textbf{50.3} & \textbf{27.6} & \textbf{25.1} & \textbf{48.3} & \textbf{25.2} & \textbf{22.8} & \textbf{48.0} & \textbf{25.3} & \textbf{23.1} & \textbf{46.3} & \textbf{23.6} & \textbf{21.7} \\
+ & OPTION & \textbf{50.3} & \textbf{27.6} & \textbf{25.1} & \textbf{48.3} & \textbf{25.2} & \textbf{22.8} & \textbf{48.0} & \textbf{25.3} & \textbf{23.1} & \textbf{46.3} & \textbf{23.6} & \textbf{21.7} \\
  & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 \\
  & GCFAggMVC (CVPR23) & 31.1 & 5.9 & 4.8 & 29.6 & 4.2 & 3.4 & 27.2 & 2.6 & 1.7 & 25.5 & 1.8 & 1.1 \\
  & MRG-UMC (TNNLS25) & \underline{37.9} & \underline{12.1} & \underline{9.4} & \underline{35.2} & \underline{7.9} & \underline{6.3} & 26.5 & 2.6 & 1.9 & \underline{36.6} & \underline{15.3} & \underline{12.3} \\
@@ -443,7 +443,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 31.3 & 4.8 & 3.3 & \underline{29.2} & 2.6 & 1.6 & 26.4 & 1.5 & 0.9 \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{Coil20}}
- & OT-CFM & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{73.5} & \textbf{75.5} & \textbf{60.3} & \textbf{66.4} & \textbf{63.2} & \textbf{45.8} & \textbf{51.5} & \textbf{49.2} & \textbf{28.4} \\
+ & OPTION & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{73.5} & \textbf{75.5} & \textbf{60.3} & \textbf{66.4} & \textbf{63.2} & \textbf{45.8} & \textbf{51.5} & \textbf{49.2} & \textbf{28.4} \\
  & MFLVC (CVPR22) & 57.9 & 77.0 & 48.9 & 44.6 & 58.2 & 34.6 & 38.3 & 44.9 & 22.0 & 33.1 & 36.9 & 15.5 \\
  & GCFAggMVC (CVPR23) & 78.5 & 87.2 & 73.1 & 61.9 & 67.6 & 47.3 & 51.2 & 56.0 & \underline{33.8} & 38.3 & 44.3 & 20.3 \\
  & MRG-UMC (TNNLS25) & 61.3 & 83.1 & 59.3 & 59.2 & 67.7 & 44.4 & 39.6 & 51.4 & 23.9 & 33.3 & 43.1 & 16.8 \\
@@ -454,7 +454,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 63.7 & 82.6 & 61.9 & 46.7 & 63.5 & 37.7 & 44.0 & 52.8 & 27.6 & 33.3 & 41.7 & 15.9 \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{CUB}}
- & OT-CFM & \textbf{79.2} & \textbf{77.4} & \textbf{67.1} & \textbf{69.5} & \textbf{61.9} & \textbf{51.1} & \textbf{60.5} & \underline{51.6} & \underline{39.4} & \underline{53.0} & \underline{48.5} & \underline{35.9} \\
+ & OPTION & \textbf{79.2} & \textbf{77.4} & \textbf{67.1} & \textbf{69.5} & \textbf{61.9} & \textbf{51.1} & \textbf{60.5} & \underline{51.6} & \underline{39.4} & \underline{53.0} & \underline{48.5} & \underline{35.9} \\
  & MFLVC (CVPR22) & 60.0 & 67.4 & 52.7 & 50.0 & 54.9 & 41.3 & 36.2 & 36.1 & 23.7 & 40.8 & 31.8 & 22.5 \\
  & GCFAggMVC (CVPR23) & 78.2 & \underline{74.9} & \underline{65.3} & 58.3 & 49.5 & 38.1 & 48.0 & 29.9 & 21.3 & 39.0 & 20.9 & 13.1 \\
  & MRG-UMC (TNNLS25) & \underline{78.5} & 74.6 & 63.8 & \underline{63.2} & 53.3 & 41.6 & 45.2 & 33.0 & 22.9 & 33.2 & 21.3 & 12.1 \\
@@ -465,7 +465,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 54.3 & \underline{60.1} & \underline{44.0} & \underline{59.3} & \textbf{61.3} & \textbf{46.3} & \textbf{55.7} & \textbf{61.7} & \textbf{46.7} \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{Handwritten}}
- & OT-CFM & \underline{94.1} & 88.5 & \underline{87.3} & \underline{74.6} & 60.8 & \underline{57.7} & \textbf{61.6} & \underline{41.8} & \textbf{38.0} & \underline{45.6} & \underline{25.3} & \underline{21.1} \\
+ & OPTION & \underline{94.1} & 88.5 & \underline{87.3} & \underline{74.6} & 60.8 & \underline{57.7} & \textbf{61.6} & \underline{41.8} & \textbf{38.0} & \underline{45.6} & \underline{25.3} & \underline{21.1} \\
  & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 74.2 & 58.9 & 55.4 & \underline{60.2} & 39.1 & \underline{34.5} & 44.2 & 20.5 & 16.1 \\
  & GCFAggMVC (CVPR23) & 80.5 & 78.3 & 69.6 & 69.3 & 52.5 & 47.9 & 52.9 & 30.2 & 25.3 & 39.1 & 15.9 & 11.9 \\
  & MRG-UMC (TNNLS25) & 93.8 & \underline{88.9} & 87.3 & \textbf{80.8} & \underline{65.0} & \textbf{61.1} & 57.2 & \textbf{48.7} & 31.3 & \textbf{50.7} & \textbf{38.2} & \textbf{25.7} \\
@@ -476,7 +476,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
  & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 67.5 & 47.8 & 44.9 & 52.8 & 29.6 & 25.6 & 36.7 & 13.7 & 10.3 \\
 \midrule
 \multirow{9}{*}{\rotatebox{90}{NUS-WIDE}}
- & OT-CFM & \textbf{19.6} & 16.0 & 5.5 & \textbf{17.8} & 15.9 & \textbf{5.2} & \textbf{15.9} & 12.2 & \textbf{3.2} & \textbf{14.1} & 9.5 & 1.7 \\
+ & OPTION & \textbf{19.6} & 16.0 & 5.5 & \textbf{17.8} & 15.9 & \textbf{5.2} & \textbf{15.9} & 12.2 & \textbf{3.2} & \textbf{14.1} & 9.5 & 1.7 \\
  & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.1 & \underline{18.6} & 4.4 & 13.0 & 15.3 & \underline{3.2} & 11.2 & 11.7 & 1.7 \\
  & GCFAggMVC (CVPR23) & 17.6 & \textbf{23.2} & \textbf{6.9} & 14.3 & 18.2 & 4.3 & 13.5 & \textbf{15.3} & 3.2 & 11.0 & 11.4 & 1.6 \\
  & MRG-UMC (TNNLS25) & \underline{17.8} & 19.1 & 4.8 & \underline{15.2} & 15.2 & 3.3 & 13.3 & 13.9 & 2.2 & \underline{12.4} & 12.0 & 1.6 \\
@@ -497,7 +497,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
 
 
 
-\textbf{Analysis:} Traditional methods fail catastrophically when alignment is lost. OT-CFM, armed with the Gromov-Wasserstein loss, successfully aligns geometric structures without needing point-wise correspondence, maintaining high accuracy even at high unaligned rates.
+\textbf{Analysis:} Traditional methods fail catastrophically when alignment is lost. OPTION, armed with the Gromov-Wasserstein loss, successfully aligns geometric structures without needing point-wise correspondence, maintaining high accuracy even at high unaligned rates.
 
 % ----------------------------------------------------------------------
 \subsection{Ablation Study (RQ4)}
@@ -526,7 +526,7 @@ To verify the effectiveness of each module, we conduct ablation studies on the \
 \subsection{Sensitivity Analysis}
 \label{subsec:sensitivity}
 
-% We conduct a systematic sensitivity analysis to investigate the robustness of OT-CFM to key hyperparameters. Following standard practice~\citep{bergstra2012random}, we quantify parameter sensitivity using the normalized performance range: $S = (\text{ACC}_{\max} - \text{ACC}_{\min}) / \text{ACC}_{\max}$, where higher values indicate greater sensitivity.
+% We conduct a systematic sensitivity analysis to investigate the robustness of OPTION to key hyperparameters. Following standard practice~\citep{bergstra2012random}, we quantify parameter sensitivity using the normalized performance range: $S = (\text{ACC}_{\max} - \text{ACC}_{\min}) / \text{ACC}_{\max}$, where higher values indicate greater sensitivity.
 
 We quantify parameter sensitivity using the normalized performance range: $S = (\text{ACC}_{\max} - \text{ACC}_{\min}) / \text{ACC}_{\max}$, where higher values indicate greater sensitivity.
 
@@ -552,7 +552,7 @@ ODE Steps           & 0.047 & 10    & 0.400$\pm$0.013 \\
 \vskip -0.1in
 \end{table}
 
-\textbf{Key Findings.} (1) \emph{$\lambda_{gw}$ exhibits the highest sensitivity} ($S=0.086$), confirming that Gromov-Wasserstein structural alignment is critical for cross-view correspondence learning. Performance degrades sharply when $\lambda_{gw} < 0.05$ or $\lambda_{gw} > 0.5$, suggesting a delicate balance between structural preservation and flexibility. (2) \emph{ODE integration converges rapidly}: performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This finding has significant practical implications, enabling $5\times$--$10\times$ faster inference compared to diffusion-based alternatives that require 50--100 steps. (3) \emph{Loss weight interactions}: $\lambda_{cluster}$ and $\lambda_{recon}$ show moderate sensitivity ($S \approx 0.05$), indicating that OT-CFM is relatively robust to their exact values within reasonable ranges ([0.5, 5.0] for $\lambda_{cluster}$, [0.3, 2.0] for $\lambda_{recon}$). (4) \emph{Architecture parameters} (latent dimension, flow hidden dimension) and training hyperparameters (learning rate, dropout) show low sensitivity ($S < 0.05$), demonstrating that OT-CFM's performance is primarily driven by the loss function design rather than architectural choices.
+\textbf{Key Findings.} (1) \emph{$\lambda_{gw}$ exhibits the highest sensitivity} ($S=0.086$), confirming that Gromov-Wasserstein structural alignment is critical for cross-view correspondence learning. Performance degrades sharply when $\lambda_{gw} < 0.05$ or $\lambda_{gw} > 0.5$, suggesting a delicate balance between structural preservation and flexibility. (2) \emph{ODE integration converges rapidly}: performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This finding has significant practical implications, enabling $5\times$--$10\times$ faster inference compared to diffusion-based alternatives that require 50--100 steps. (3) \emph{Loss weight interactions}: $\lambda_{cluster}$ and $\lambda_{recon}$ show moderate sensitivity ($S \approx 0.05$), indicating that OPTION is relatively robust to their exact values within reasonable ranges ([0.5, 5.0] for $\lambda_{cluster}$, [0.3, 2.0] for $\lambda_{recon}$). (4) \emph{Architecture parameters} (latent dimension, flow hidden dimension) and training hyperparameters (learning rate, dropout) show low sensitivity ($S < 0.05$), demonstrating that OPTION's performance is primarily driven by the loss function design rather than architectural choices.
 
 \begin{figure}[t]
     \centering
@@ -567,7 +567,7 @@ ODE Steps           & 0.047 & 10    & 0.400$\pm$0.013 \\
 \subsection{Convergence Analysis}
 \label{subsec:convergence}
 
-To demonstrate the optimization stability and convergence properties of OT-CFM, we conduct a comprehensive training dynamics analysis with statistical validation. We run 5 independent experiments with different random seeds (42--46) and track the evolution of loss components and clustering metrics throughout training on the Handwritten dataset. Figure~\ref{fig:convergence} illustrates the convergence behavior with mean values and standard deviation bands.
+To demonstrate the optimization stability and convergence properties of OPTION, we conduct a comprehensive training dynamics analysis with statistical validation. We run 5 independent experiments with different random seeds (42--46) and track the evolution of loss components and clustering metrics throughout training on the Handwritten dataset. Figure~\ref{fig:convergence} illustrates the convergence behavior with mean values and standard deviation bands.
 
 \begin{figure}[t]
     \centering
@@ -576,13 +576,13 @@ To demonstrate the optimization stability and convergence properties of OT-CFM, 
     \label{fig:convergence}
 \end{figure}
 
-\textbf{Statistical Validation.} Our multi-seed experiments (Table~\ref{tab:convergence_stats}) demonstrate OT-CFM's robustness: after 100 epochs, we achieve ACC=$85.1\pm7.0$\%, NMI=$86.4\pm3.9$\%, and ARI=$80.0\pm6.6$\%. The relatively low standard deviation in NMI indicates stable semantic clustering structure across runs, while the variance in ACC reflects sensitivity to random initialization—a common characteristic in deep clustering methods. Importantly, the best seed achieves ACC=95.2\%, demonstrating OT-CFM's potential when initialization is favorable.
+\textbf{Statistical Validation.} Our multi-seed experiments (Table~\ref{tab:convergence_stats}) demonstrate OPTION's robustness: after 100 epochs, we achieve ACC=$85.1\pm7.0$\%, NMI=$86.4\pm3.9$\%, and ARI=$80.0\pm6.6$\%. The relatively low standard deviation in NMI indicates stable semantic clustering structure across runs, while the variance in ACC reflects sensitivity to random initialization—a common characteristic in deep clustering methods. Importantly, the best seed achieves ACC=95.2\%, demonstrating OPTION's potential when initialization is favorable.
 
-\textbf{Loss Component Balance.} The bottom panel of Figure~\ref{fig:convergence} shows the evolution of individual loss components. All losses decrease monotonically with small variance bands, indicating: (i) no single objective dominates the optimization; (ii) the multi-task learning is well-balanced across reconstruction ($\mathcal{L}_{recon}$), GW alignment ($\mathcal{L}_{gw}$), and clustering ($\mathcal{L}_{cluster}$) objectives. The tight variance bands confirm that OT-CFM's optimization landscape is well-conditioned across different random seeds.
+\textbf{Loss Component Balance.} The bottom panel of Figure~\ref{fig:convergence} shows the evolution of individual loss components. All losses decrease monotonically with small variance bands, indicating: (i) no single objective dominates the optimization; (ii) the multi-task learning is well-balanced across reconstruction ($\mathcal{L}_{recon}$), GW alignment ($\mathcal{L}_{gw}$), and clustering ($\mathcal{L}_{cluster}$) objectives. The tight variance bands confirm that OPTION's optimization landscape is well-conditioned across different random seeds.
 
 \textbf{Convergence Speed and Stability.} The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) \emph{Fast convergence}: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) \emph{Smooth trajectories}: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) \emph{Consistent variance}: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds.
 
-\textbf{Implications.} These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OT-CFM's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning. Moreover, the statistical validation across 5 seeds provides confidence intervals for reporting results, following best practices in deep learning evaluation.
+\textbf{Implications.} These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning. Moreover, the statistical validation across 5 seeds provides confidence intervals for reporting results, following best practices in deep learning evaluation.
 
 \begin{table}[t]
 \centering
@@ -629,9 +629,9 @@ ARI (\%)   & 80.0 & 6.6 & 70.7 & 89.6 \\
     \label{fig:tsne}
 \end{figure}
 
-\textbf{Inference Speed.} We compare the wall-clock time for sampling/imputation between OT-CFM and the diffusion-based DCG.
+\textbf{Inference Speed.} We compare the wall-clock time for sampling/imputation between OPTION and the diffusion-based DCG.
 % TODO: Insert a small table: Method | Inference Time (s) | Speedup
-\textbf{Analysis:} OT-CFM achieves a $10\times$ to $50\times$ speedup over DCG due to the use of straight vector fields and deterministic ODE solvers, making it practical for large-scale applications.
+\textbf{Analysis:} OPTION achieves a $10\times$ to $50\times$ speedup over DCG due to the use of straight vector fields and deterministic ODE solvers, making it practical for large-scale applications.
 
 
 \bibliography{ref}
@@ -702,7 +702,7 @@ Flow Hidden Dim       & [128, 512]    & 0.019 & 192   & 0.397$\pm$0.009 \\
 
 \textbf{Flow Parameters.} The ODE integration steps parameter shows moderate sensitivity ($S = 0.047$) with optimal performance at $N^* = 10$ steps. Notably, performance remains stable for $N \geq 10$, with Pearson correlation $r = -0.20$ ($p = 0.67$), indicating no significant benefit from additional integration steps. This finding validates our theoretical analysis that optimal transport paths enable efficient few-step generation.
 
-\textbf{Architecture Parameters.} Both latent dimension and flow hidden dimension exhibit low sensitivity ($S < 0.05$), suggesting that OT-CFM's performance is robust to architectural choices within reasonable ranges. The optimal latent dimension of 32 is notably smaller than the default value of 128, suggesting potential for computational savings without performance degradation.
+\textbf{Architecture Parameters.} Both latent dimension and flow hidden dimension exhibit low sensitivity ($S < 0.05$), suggesting that OPTION's performance is robust to architectural choices within reasonable ranges. The optimal latent dimension of 32 is notably smaller than the default value of 128, suggesting potential for computational savings without performance degradation.
 
 \textbf{Training Parameters.} Learning rate and dropout show the lowest sensitivity among examined parameters, indicating that standard training practices (learning rate $\approx 10^{-3}$, minimal or no dropout) work well across different configurations.
 
