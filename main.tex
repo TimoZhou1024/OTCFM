@@ -282,70 +282,70 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
 \setlength{\tabcolsep}{2.5pt}
 \begin{footnotesize}
 \begin{sc}
-\begin{tabular}{llcccccccccccc}
+\begin{tabular}{llccccccccccccccc}
 \toprule
-& Method & \multicolumn{3}{c}{0\%} & \multicolumn{3}{c}{10\%} & \multicolumn{3}{c}{30\%} & \multicolumn{3}{c}{50\%} \\
- &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
+& Method & \multicolumn{3}{c}{0\%} & \multicolumn{3}{c}{10\%} & \multicolumn{3}{c}{30\%} & \multicolumn{3}{c}{50\%} & \multicolumn{3}{c}{70\%} \\
+ &  & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI & ACC & NMI & ARI \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{BDGP}}
- & OPTION & \textbf{50.5} & \underline{27.3} & \textbf{24.8} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{46.6} & \textbf{19.8} & \textbf{17.8} \\
- & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 26.8 & 2.9 & 1.7 \\
- & SURE (TPAMI22) & 35.5 & 16.2 & 8.5 & 41.8 & 16.8 & 9.9 & 41.8 & 16.8 & 9.9 & 31.0 & 9.0 & 6.3 \\
- & DealMVC (CVPR23) & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.5 & 2.4 & 1.3 \\
- & GCFAggMVC (CVPR23) & 31.1 & 5.9 & 4.8 & 31.1 & 5.9 & 4.8 & 31.1 & 5.9 & 4.8 & 24.5 & 2.4 & 1.3 \\
- & DCG (AAAI25) & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{39.2} & \underline{18.3} & \underline{11.3} \\
- & MGCCFF (AAAI25) & 26.6 & 2.5 & 1.4 & 26.6 & 2.5 & 1.4 & 26.6 & 2.5 & 1.4 & 24.5 & 1.3 & 0.6 \\
- & FreeCSL (CVPR25) & 31.2 & 6.0 & 4.9 & 31.2 & 6.0 & 4.9 & 31.2 & 6.0 & 4.9 & 25.6 & 2.9 & 1.5 \\
- & ROLL (CVPR25) & 30.4 & 7.3 & 5.9 & 30.4 & 7.3 & 5.9 & 30.4 & 7.3 & 5.9 & 22.8 & 0.7 & 0.2 \\
- & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 25.4 & 2.7 & 1.6 \\
+ & OPTION & \textbf{50.5} & \underline{27.3} & \textbf{24.8} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{50.4} & \underline{27.2} & \textbf{24.7} & \textbf{46.6} & \textbf{19.8} & \textbf{17.8} & \textbf{33.9} & \underline{9.3} & \textbf{6.1} \\
+ & MFLVC (CVPR22) & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 20.0 & 0.0 & 0.0 & 26.8 & 2.9 & 1.7 & \underline{27.6} & 4.9 & \underline{2.5} \\
+ & SURE (TPAMI22) & 35.5 & 16.2 & 8.5 & 41.8 & 16.8 & 9.9 & 41.8 & 16.8 & 9.9 & 31.0 & 9.0 & 6.3 & 26.6 & 4.5 & 2.5 \\
+ & DealMVC (CVPR23) & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.8 & 4.8 & 0.6 & 24.5 & 2.4 & 1.3 & 23.0 & 1.2 & 0.4 \\
+ & GCFAggMVC (CVPR23) & 31.1 & 5.9 & 4.8 & 31.1 & 5.9 & 4.8 & 31.1 & 5.9 & 4.8 & 24.5 & 2.4 & 1.3 & 26.3 & 2.5 & 1.4 \\
+ & DCG (AAAI25) & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{45.8} & \textbf{27.9} & \underline{21.7} & \underline{39.2} & \underline{18.3} & \underline{11.3} & 27.6 & \textbf{9.7} & 1.5 \\
+ & MGCCFF (AAAI25) & 26.6 & 2.5 & 1.4 & 26.6 & 2.5 & 1.4 & 26.6 & 2.5 & 1.4 & 24.5 & 1.3 & 0.6 & 24.6 & 2.5 & 1.1 \\
+ & FreeCSL (CVPR25) & 31.2 & 6.0 & 4.9 & 31.2 & 6.0 & 4.9 & 31.2 & 6.0 & 4.9 & 25.6 & 2.9 & 1.5 & 25.3 & 1.5 & 0.8 \\
+ & ROLL (CVPR25) & 30.4 & 7.3 & 5.9 & 30.4 & 7.3 & 5.9 & 30.4 & 7.3 & 5.9 & 22.8 & 0.7 & 0.2 & 26.5 & 6.2 & 1.1 \\
+ & PROTOCOL (ICML25) & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 35.4 & 10.6 & 9.3 & 25.4 & 2.7 & 1.6 & 26.5 & 2.9 & 1.2 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{Coil20}}
- & OPTION & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{87.6} & \textbf{92.9} & \textbf{84.6} \\
- & MFLVC (CVPR22) & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & \underline{48.3} & 63.3 & 35.1 \\
- & SURE (TPAMI22) & 75.2 & 86.0 & 69.0 & 70.2 & 85.0 & 67.1 & 70.2 & 85.0 & 67.1 & 41.5 & 58.4 & 27.4 \\
- & DealMVC (CVPR23) & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 34.6 & 55.9 & 19.3 \\
- & GCFAggMVC (CVPR23) & 78.5 & 87.2 & 73.1 & 78.5 & 87.2 & 73.1 & 78.5 & 87.2 & 73.1 & 41.9 & 58.1 & 28.7 \\
- & DCG (AAAI25) & 62.7 & 82.8 & 58.4 & 62.7 & 82.8 & 58.4 & 62.7 & 82.8 & 58.4 & 47.7 & \underline{70.2} & \underline{36.8} \\
- & MGCCFF (AAAI25) & 45.0 & 68.1 & 39.0 & 45.0 & 68.1 & 39.0 & 45.0 & 68.1 & 39.0 & 20.6 & 36.0 & 9.6 \\
- & FreeCSL (CVPR25) & 39.2 & 54.9 & 23.3 & 39.2 & 54.9 & 23.3 & 39.2 & 54.9 & 23.3 & 29.6 & 40.2 & 13.0 \\
- & ROLL (CVPR25) & \underline{80.0} & \underline{88.5} & \underline{76.4} & \underline{80.0} & \underline{88.5} & \underline{76.4} & \underline{80.0} & \underline{88.5} & \underline{76.4} & 37.5 & 57.7 & 22.8 \\
- & PROTOCOL (ICML25) & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 41.0 & 60.4 & 29.1 \\
+ & OPTION & \textbf{88.7} & \textbf{93.8} & \textbf{86.4} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{88.4} & \textbf{93.7} & \textbf{86.2} & \textbf{87.6} & \textbf{92.9} & \textbf{84.6} & \textbf{86.1} & \textbf{92.3} & \textbf{83.3} \\
+ & MFLVC (CVPR22) & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & 57.9 & 77.0 & 48.9 & \underline{48.3} & 63.3 & 35.1 & \underline{37.9} & \underline{54.5} & \underline{24.4} \\
+ & SURE (TPAMI22) & 75.2 & 86.0 & 69.0 & 70.2 & 85.0 & 67.1 & 70.2 & 85.0 & 67.1 & 41.5 & 58.4 & 27.4 & 35.0 & 48.3 & 10.1 \\
+ & DealMVC (CVPR23) & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 57.7 & 83.0 & 60.4 & 34.6 & 55.9 & 19.3 & 29.4 & 38.5 & 9.5 \\
+ & GCFAggMVC (CVPR23) & 78.5 & 87.2 & 73.1 & 78.5 & 87.2 & 73.1 & 78.5 & 87.2 & 73.1 & 41.9 & 58.1 & 28.7 & 35.0 & 50.5 & 19.3 \\
+ & DCG (AAAI25) & 62.7 & 82.8 & 58.4 & 62.7 & 82.8 & 58.4 & 62.7 & 82.8 & 58.4 & 47.7 & \underline{70.2} & \underline{36.8} & 34.4 & 54.4 & 19.8 \\
+ & MGCCFF (AAAI25) & 45.0 & 68.1 & 39.0 & 45.0 & 68.1 & 39.0 & 45.0 & 68.1 & 39.0 & 20.6 & 36.0 & 9.6 & 20.0 & 30.7 & 5.4 \\
+ & FreeCSL (CVPR25) & 39.2 & 54.9 & 23.3 & 39.2 & 54.9 & 23.3 & 39.2 & 54.9 & 23.3 & 29.6 & 40.2 & 13.0 & 27.5 & 40.4 & 11.9 \\
+ & ROLL (CVPR25) & \underline{80.0} & \underline{88.5} & \underline{76.4} & \underline{80.0} & \underline{88.5} & \underline{76.4} & \underline{80.0} & \underline{88.5} & \underline{76.4} & 37.5 & 57.7 & 22.8 & 35.2 & 53.4 & 20.1 \\
+ & PROTOCOL (ICML25) & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 63.7 & 82.6 & 61.9 & 41.0 & 60.4 & 29.1 & 31.9 & 49.6 & 18.0 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{CUB}}
- & OPTION & \textbf{78.6} & \textbf{77.5} & \textbf{66.4} & \textbf{79.6} & \textbf{76.3} & \textbf{65.4} & \textbf{79.3} & \textbf{77.8} & \textbf{67.5} & \textbf{73.4} & \textbf{69.9} & \textbf{57.0} \\
- & MFLVC (CVPR22) & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 22.3 & 13.1 & 4.9 \\
- & SURE (TPAMI22) & 70.7 & 61.9 & 52.3 & 75.7 & 67.1 & 56.3 & 75.7 & 67.1 & 56.3 & \underline{47.0} & \underline{49.9} & \underline{28.7} \\
- & DealMVC (CVPR23) & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 34.3 & 36.0 & 18.0 \\
- & GCFAggMVC (CVPR23) & \underline{78.2} & \underline{74.9} & \underline{65.3} & \underline{78.2} & \underline{74.9} & \underline{65.3} & \underline{78.2} & \underline{74.9} & \underline{65.3} & 38.8 & 38.6 & 20.4 \\
- & DCG (AAAI25) & 22.2 & 13.8 & 4.8 & 22.2 & 13.8 & 4.8 & 22.2 & 13.8 & 4.8 & 18.2 & 5.9 & 0.9 \\
- & MGCCFF (AAAI25) & 38.2 & 38.5 & 21.3 & 38.2 & 38.5 & 21.3 & 38.2 & 38.5 & 21.3 & 22.2 & 19.6 & 5.8 \\
- & FreeCSL (CVPR25) & 26.3 & 16.6 & 6.9 & 26.3 & 16.6 & 6.9 & 26.3 & 16.6 & 6.9 & 20.2 & 8.9 & 2.7 \\
- & ROLL (CVPR25) & 75.0 & 72.8 & 59.6 & 75.0 & 72.8 & 59.6 & 75.0 & 72.8 & 59.6 & 38.3 & 41.3 & 22.0 \\
- & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 33.3 & 28.8 & 5.0 \\
+ & OPTION & \textbf{78.6} & \textbf{77.5} & \textbf{66.4} & \textbf{79.6} & \textbf{76.3} & \textbf{65.4} & \textbf{79.3} & \textbf{77.8} & \textbf{67.5} & \textbf{73.4} & \textbf{69.9} & \textbf{57.0} & \textbf{74.7} & \textbf{71.2} & \textbf{59.1} \\
+ & MFLVC (CVPR22) & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 60.0 & 67.4 & 52.7 & 22.3 & 13.1 & 4.9 & 22.3 & 13.1 & 4.9 \\
+ & SURE (TPAMI22) & 70.7 & 61.9 & 52.3 & 75.7 & 67.1 & 56.3 & 75.7 & 67.1 & 56.3 & \underline{47.0} & \underline{49.9} & \underline{28.7} & \underline{47.0} & \underline{49.9} & \underline{28.7} \\
+ & DealMVC (CVPR23) & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 65.3 & 69.6 & 54.4 & 34.3 & 36.0 & 18.0 & 34.3 & 36.0 & 18.0 \\
+ & GCFAggMVC (CVPR23) & \underline{78.2} & \underline{74.9} & \underline{65.3} & \underline{78.2} & \underline{74.9} & \underline{65.3} & \underline{78.2} & \underline{74.9} & \underline{65.3} & 38.8 & 38.6 & 20.4 & 38.8 & 38.6 & 20.4 \\
+ & DCG (AAAI25) & 22.2 & 13.8 & 4.8 & 22.2 & 13.8 & 4.8 & 22.2 & 13.8 & 4.8 & 18.2 & 5.9 & 0.9 & 18.2 & 5.9 & 0.9 \\
+ & MGCCFF (AAAI25) & 38.2 & 38.5 & 21.3 & 38.2 & 38.5 & 21.3 & 38.2 & 38.5 & 21.3 & 22.2 & 19.6 & 5.8 & 22.2 & 19.6 & 5.8 \\
+ & FreeCSL (CVPR25) & 26.3 & 16.6 & 6.9 & 26.3 & 16.6 & 6.9 & 26.3 & 16.6 & 6.9 & 20.2 & 8.9 & 2.7 & 20.2 & 8.9 & 2.7 \\
+ & ROLL (CVPR25) & 75.0 & 72.8 & 59.6 & 75.0 & 72.8 & 59.6 & 75.0 & 72.8 & 59.6 & 38.3 & 41.3 & 22.0 & 38.3 & 41.3 & 22.0 \\
+ & PROTOCOL (ICML25) & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 55.5 & 59.9 & 44.9 & 33.3 & 28.8 & 5.0 & 33.3 & 28.8 & 5.0 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{Handwritten}}
- & OPTION & \underline{94.1} & \underline{88.5} & \underline{87.3} & \underline{94.1} & \underline{88.5} & \underline{87.3} & \textbf{93.7} & \textbf{87.8} & \textbf{86.5} & \textbf{92.7} & \textbf{85.8} & \textbf{84.4} \\
- & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 84.0 & 82.2 & 76.0 & 85.3 & \underline{83.8} & \underline{78.5} & \underline{84.3} & \underline{81.8} & \underline{76.2} \\
- & SURE (TPAMI22) & 73.0 & 71.2 & 62.0 & 77.1 & 73.1 & 62.5 & 49.2 & 47.1 & 30.5 & 27.7 & 26.7 & 10.6 \\
- & DealMVC (CVPR23) & 80.2 & 77.4 & 69.2 & 80.2 & 77.4 & 69.2 & 69.4 & 72.2 & 57.2 & 31.2 & 27.3 & 11.9 \\
- & GCFAggMVC (CVPR23) & 80.5 & 78.3 & 69.6 & 80.5 & 78.3 & 69.6 & 80.3 & 77.4 & 69.6 & 13.2 & 0.9 & -0.0 \\
- & DCG (AAAI25) & 92.4 & 85.7 & 83.8 & 92.4 & 85.7 & 83.8 & \underline{89.2} & 81.6 & 78.1 & 48.1 & 48.3 & 25.0 \\
- & MGCCFF (AAAI25) & 17.8 & 7.5 & 3.2 & 17.8 & 7.5 & 3.2 & 17.8 & 5.4 & 2.3 & 16.9 & 4.9 & 2.1 \\
- & FreeCSL (CVPR25) & 30.2 & 16.9 & 9.8 & 30.2 & 16.9 & 9.8 & 30.7 & 13.6 & 8.5 & 21.3 & 7.2 & 3.5 \\
- & ROLL (CVPR25) & \textbf{97.2} & \textbf{93.7} & \textbf{93.8} & \textbf{97.2} & \textbf{93.7} & \textbf{93.8} & 71.6 & 73.3 & 63.2 & 12.8 & 0.8 & -0.0 \\
- & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 80.5 & 74.9 & 70.0 & 63.4 & 57.4 & 44.3 & 37.4 & 32.2 & 15.1 \\
+ & OPTION & \underline{94.1} & \underline{88.5} & \underline{87.3} & \underline{94.1} & \underline{88.5} & \underline{87.3} & \textbf{93.7} & \textbf{87.8} & \textbf{86.5} & \textbf{92.7} & \textbf{85.8} & \textbf{84.4} & \textbf{90.6} & \textbf{82.5} & \textbf{80.6} \\
+ & MFLVC (CVPR22) & 84.0 & 82.2 & 76.0 & 84.0 & 82.2 & 76.0 & 85.3 & \underline{83.8} & \underline{78.5} & \underline{84.3} & \underline{81.8} & \underline{76.2} & \underline{62.3} & \underline{61.9} & \underline{50.9} \\
+ & SURE (TPAMI22) & 73.0 & 71.2 & 62.0 & 77.1 & 73.1 & 62.5 & 49.2 & 47.1 & 30.5 & 27.7 & 26.7 & 10.6 & 26.8 & 23.1 & 5.3 \\
+ & DealMVC (CVPR23) & 80.2 & 77.4 & 69.2 & 80.2 & 77.4 & 69.2 & 69.4 & 72.2 & 57.2 & 31.2 & 27.3 & 11.9 & 19.6 & 9.9 & 2.6 \\
+ & GCFAggMVC (CVPR23) & 80.5 & 78.3 & 69.6 & 80.5 & 78.3 & 69.6 & 80.3 & 77.4 & 69.6 & 13.2 & 0.9 & -0.0 & 19.5 & 13.1 & 6.2 \\
+ & DCG (AAAI25) & 92.4 & 85.7 & 83.8 & 92.4 & 85.7 & 83.8 & \underline{89.2} & 81.6 & 78.1 & 48.1 & 48.3 & 25.0 & 36.9 & 37.6 & 12.3 \\
+ & MGCCFF (AAAI25) & 17.8 & 7.5 & 3.2 & 17.8 & 7.5 & 3.2 & 17.8 & 5.4 & 2.3 & 16.9 & 4.9 & 2.1 & 15.1 & 3.4 & 1.0 \\
+ & FreeCSL (CVPR25) & 30.2 & 16.9 & 9.8 & 30.2 & 16.9 & 9.8 & 30.7 & 13.6 & 8.5 & 21.3 & 7.2 & 3.5 & 20.0 & 5.1 & 2.3 \\
+ & ROLL (CVPR25) & \textbf{97.2} & \textbf{93.7} & \textbf{93.8} & \textbf{97.2} & \textbf{93.7} & \textbf{93.8} & 71.6 & 73.3 & 63.2 & 12.8 & 0.8 & -0.0 & 12.6 & 1.0 & -0.0 \\
+ & PROTOCOL (ICML25) & 80.5 & 74.9 & 70.0 & 80.5 & 74.9 & 70.0 & 63.4 & 57.4 & 44.3 & 37.4 & 32.2 & 15.1 & 25.0 & 15.9 & 4.1 \\
 \midrule
 \multirow{10}{*}{\rotatebox{90}{NUS-WIDE}}
- & OPTION & \textbf{19.0} & 18.7 & 6.3 & \textbf{19.4} & 17.9 & 5.2 & \textbf{19.9} & 15.9 & \textbf{5.9} & \textbf{19.1} & \underline{17.3} & \textbf{6.5} \\
- & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.6 & \underline{23.1} & 6.2 & \underline{15.2} & \textbf{21.5} & \underline{5.3} & \underline{14.9} & \textbf{19.7} & \underline{4.9} \\
- & SURE (TPAMI22) & 14.1 & 17.2 & 3.6 & 13.4 & 17.5 & 3.7 & 11.9 & 14.3 & 2.1 & 11.2 & 12.8 & 1.4 \\
- & DealMVC (CVPR23) & 16.4 & 20.8 & \underline{6.3} & 16.4 & 20.8 & \underline{6.3} & 12.2 & 7.7 & 0.4 & 10.2 & 10.0 & 0.7 \\
- & GCFAggMVC (CVPR23) & \underline{17.6} & \textbf{23.2} & \textbf{6.9} & \underline{17.6} & \textbf{23.2} & \textbf{6.9} & 12.2 & 15.1 & 2.7 & 9.8 & 12.1 & 1.4 \\
- & DCG (AAAI25) & 17.1 & 20.3 & 5.1 & 17.1 & 20.3 & 5.1 & 14.2 & \underline{18.1} & 3.8 & 13.2 & 16.1 & 2.7 \\
- & MGCCFF (AAAI25) & 13.6 & 7.2 & 0.7 & 13.6 & 7.2 & 0.7 & 13.0 & 7.4 & 0.8 & 11.9 & 6.4 & 0.3 \\
- & FreeCSL (CVPR25) & 10.1 & 10.5 & 1.2 & 10.1 & 10.5 & 1.2 & 9.6 & 9.9 & 0.7 & 9.2 & 9.5 & 0.6 \\
- & ROLL (CVPR25) & 17.2 & 21.3 & 5.7 & 17.2 & 21.3 & 5.7 & 12.0 & 15.9 & 3.0 & 9.8 & 11.9 & 1.4 \\
- & PROTOCOL (ICML25) & 15.5 & 17.8 & 3.7 & 15.5 & 17.8 & 3.7 & 13.8 & 15.6 & 2.6 & 13.2 & 13.5 & 1.6 \\
+ & OPTION & \textbf{19.0} & 18.7 & 6.3 & \textbf{19.4} & 17.9 & 5.2 & \textbf{19.9} & 15.9 & \textbf{5.9} & \textbf{19.1} & \underline{17.3} & \textbf{6.5} & \textbf{17.9} & \textbf{20.2} & \textbf{6.8} \\
+ & MFLVC (CVPR22) & 15.6 & \underline{23.1} & 6.2 & 15.6 & \underline{23.1} & 6.2 & \underline{15.2} & \textbf{21.5} & \underline{5.3} & \underline{14.9} & \textbf{19.7} & \underline{4.9} & 12.5 & \underline{15.6} & 3.0 \\
+ & SURE (TPAMI22) & 14.1 & 17.2 & 3.6 & 13.4 & 17.5 & 3.7 & 11.9 & 14.3 & 2.1 & 11.2 & 12.8 & 1.4 & 11.9 & 13.0 & 0.8 \\
+ & DealMVC (CVPR23) & 16.4 & 20.8 & \underline{6.3} & 16.4 & 20.8 & \underline{6.3} & 12.2 & 7.7 & 0.4 & 10.2 & 10.0 & 0.7 & 9.8 & 8.5 & 0.3 \\
+ & GCFAggMVC (CVPR23) & \underline{17.6} & \textbf{23.2} & \textbf{6.9} & \underline{17.6} & \textbf{23.2} & \textbf{6.9} & 12.2 & 15.1 & 2.7 & 9.8 & 12.1 & 1.4 & 9.3 & 11.8 & 1.3 \\
+ & DCG (AAAI25) & 17.1 & 20.3 & 5.1 & 17.1 & 20.3 & 5.1 & 14.2 & \underline{18.1} & 3.8 & 13.2 & 16.1 & 2.7 & \underline{13.5} & 14.4 & \underline{2.7} \\
+ & MGCCFF (AAAI25) & 13.6 & 7.2 & 0.7 & 13.6 & 7.2 & 0.7 & 13.0 & 7.4 & 0.8 & 11.9 & 6.4 & 0.3 & 11.4 & 6.8 & 0.0 \\
+ & FreeCSL (CVPR25) & 10.1 & 10.5 & 1.2 & 10.1 & 10.5 & 1.2 & 9.6 & 9.9 & 0.7 & 9.2 & 9.5 & 0.6 & 8.4 & 8.4 & 0.3 \\
+ & ROLL (CVPR25) & 17.2 & 21.3 & 5.7 & 17.2 & 21.3 & 5.7 & 12.0 & 15.9 & 3.0 & 9.8 & 11.9 & 1.4 & 10.0 & 11.8 & 1.3 \\
+ & PROTOCOL (ICML25) & 15.5 & 17.8 & 3.7 & 15.5 & 17.8 & 3.7 & 13.8 & 15.6 & 2.6 & 13.2 & 13.5 & 1.6 & 13.7 & 12.5 & 1.9 \\
 \bottomrule
 \end{tabular}
 \end{sc}
@@ -446,24 +446,35 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
 \subsection{Ablation Study}
 \label{subsec:ablation}
 
-To verify the effectiveness of each module, we conduct ablation studies on the \texttt{Scene-15} dataset. We define the following variants:
-\begin{enumerate}
-    \item \textbf{w/o GW:} Removing the Gromov-Wasserstein structural alignment loss.
-    \item \textbf{w/o Flow:} Replacing the flow matching module with a standard regression loss for imputation.
-    \item \textbf{w/o Contrastive:} Removing the contrastive loss (only applicable in aligned settings).
-    \item \textbf{w/o Clustering:} Removing the KL-divergence clustering loss (using K-Means on features post-training).
-\end{enumerate}
+To verify the effectiveness of each component, we conduct ablation studies on Scene-15 with a missing rate of 0.7 and an unaligned rate of 0.5. Table~\ref{tab:ablation} reports the results averaged over 3 random seeds.
 
-\begin{figure}[ht]
-    \centering
-    \begin{center}
-    \centerline{\includegraphics[width=0.8\columnwidth]{example-image-c}} % Replace with actual ablation_bar.png
-    \caption{Ablation study of different components on Scene-15 dataset.}
-    \label{fig:ablation}
-    \end{center}
-\end{figure}
+\begin{table}[ht]
+\centering
+\caption{Ablation study on Scene-15 (missing rate = 0.7, unaligned rate = 0.5). Each row removes one component from the full model. Best results are in \textbf{bold}.}
+\label{tab:ablation}
+\vskip 0.1in
+\renewcommand{\arraystretch}{1.1}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{l|ccccc|ccc}
+\toprule
+\multirow{2}{*}{Variant} & \multicolumn{5}{c|}{Components} & \multicolumn{3}{c}{Scene-15} \\
+\cline{2-9}
+ & $\mathcal{L}_{GW}$ & $\mathcal{L}_{flow}$ & $\mathcal{L}_{contra}$ & $\mathcal{L}_{cluster}$ & $\mathcal{L}_{recon}$ & ACC & NMI & ARI \\
+\midrule
+w/o GW & $\times$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & 36.4$\pm$0.2 & 35.0$\pm$0.6 & 21.3$\pm$1.0 \\
+w/o Flow & $\checkmark$ & $\times$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & 36.3$\pm$1.0 & 37.0$\pm$1.1 & 22.4$\pm$1.4 \\
+w/o Contrastive & $\checkmark$ & $\checkmark$ & $\times$ & $\checkmark$ & $\checkmark$ & 25.3$\pm$1.5 & 24.9$\pm$0.8 & 11.2$\pm$1.4 \\
+w/o Clustering & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\times$ & $\checkmark$ & 26.5$\pm$1.4 & 25.1$\pm$0.7 & 12.5$\pm$0.4 \\
+w/o Recon & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\times$ & 32.4$\pm$0.5 & 31.2$\pm$0.3 & 17.2$\pm$0.2 \\
+\midrule
+Full model & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & \textbf{37.5$\pm$0.4} & \textbf{37.1$\pm$0.4} & \textbf{23.2$\pm$0.0} \\
+\bottomrule
+\end{tabular}%
+}
+\vskip -0.1in
+\end{table}
 
-\textbf{Results:} The removal of $\mathcal{L}_{GW}$ leads to a sharp performance drop in unaligned settings, validating its crucial role in structural alignment. Removing the Flow module degrades performance in high-missing-rate scenarios, proving the necessity of generative imputation.
+\textbf{Results:} (1) Removing $\mathcal{L}_{contra}$ or $\mathcal{L}_{cluster}$ causes the largest performance drops (ACC $\downarrow$12.2\% and $\downarrow$11.0\%), demonstrating that contrastive learning and clustering supervision are critical for discriminative representations. (2) Removing $\mathcal{L}_{recon}$ degrades ACC by 5.1\%, confirming reconstruction loss helps preserve view-specific information. (3) Removing $\mathcal{L}_{GW}$ or $\mathcal{L}_{flow}$ leads to moderate drops (ACC $\downarrow$1.1--1.2\%), validating their roles in structural alignment and missing-view imputation under challenging conditions.
 
 % ----------------------------------------------------------------------
 \subsection{Sensitivity Analysis}
@@ -613,6 +624,7 @@ This enables efficient training without ODE simulation, and at inference, the le
 \centering
 \caption{Loss function configuration for different MVC scenarios.}
 \label{tab:loss_config}
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lcc}
 \toprule
 \textbf{Component} & \textbf{Aligned (IMVC)} & \textbf{Unaligned (UMVC)} \\
@@ -625,6 +637,7 @@ $\mathcal{L}_{rec}$ & \checkmark & \checkmark \\
 $\mathcal{L}_{con}$ & \checkmark & $\times$ \\
 \bottomrule
 \end{tabular}
+}
 \vspace{0.3em}
 \\\footnotesize{The generative CFM loss is always active; only the conditioning source differs.}
 \end{table}
