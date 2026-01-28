@@ -541,27 +541,27 @@ To demonstrate the optimization stability and convergence properties of OPTION, 
 \subsection{Visualization and Efficiency}
 \label{subsec:vis_efficiency}
 
-\textbf{Latent Space Visualization.} Figure \ref{fig:tsne} visualizes the latent representations using t-SNE throughout the training process on the Handwritten dataset. Initially (Epoch 0), the representations are randomly distributed with clusters heavily overlapping, achieving only 33.9\% accuracy. As training progresses, the clusters become progressively more compact and well-separated. By Epoch 30, the model achieves 96.0\% accuracy with clear cluster boundaries. The visualization demonstrates that our clustering-guided flow matching effectively learns discriminative representations that naturally organize into distinct semantic clusters.
+\textbf{Latent Space Visualization.} Figure \ref{fig:tsne} visualizes the latent representations using t-SNE at the beginning and end of training on two datasets. Initially (Epoch 0), representations are randomly distributed with heavily overlapping clusters. After training, clusters become compact and well-separated: Handwritten achieves 96.0\% accuracy (from 33.9\%), and Scene-15 reaches 42.3\% (from 17.3\%). The visualization demonstrates that our clustering-guided flow matching effectively learns discriminative representations.
 
 \begin{figure}[!htbp]
     \centering
     \begin{subfigure}{0.24\columnwidth}
         \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch0.png}
-        \caption{Epoch 0 (33.9\%)}
-    \end{subfigure}
-    \begin{subfigure}{0.24\columnwidth}
-        \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch30.png}
-        \caption{Epoch 30 (96.0\%)}
-    \end{subfigure}
-    \begin{subfigure}{0.24\columnwidth}
-        \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch60.png}
-        \caption{Epoch 60 (95.5\%)}
+        \caption{Handwritten (Init)}
     \end{subfigure}
     \begin{subfigure}{0.24\columnwidth}
         \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch100.png}
-        \caption{Epoch 100 (95.5\%)}
+        \caption{Handwritten (Final)}
     \end{subfigure}
-    \caption{t-SNE visualization of latent representations during training on Handwritten. The parentheses show clustering accuracy at each checkpoint. Colors represent ground-truth classes.}
+    \begin{subfigure}{0.24\columnwidth}
+        \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch0.png}
+        \caption{Scene-15 (Init)}
+    \end{subfigure}
+    \begin{subfigure}{0.24\columnwidth}
+        \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch100.png}
+        \caption{Scene-15 (Final)}
+    \end{subfigure}
+    \caption{t-SNE visualization of latent representations before and after training. Top row: Handwritten (33.9\%$\to$96.0\%). Bottom row: Scene-15 (17.3\%$\to$42.3\%). Colors represent ground-truth classes.}
     \label{fig:tsne}
 \end{figure}
 
