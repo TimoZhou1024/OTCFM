@@ -109,7 +109,7 @@ For the \textit{incomplete} multi-view scenario (IMVC), contrastive learning-bas
 Although these methods have achieved promising performance in incomplete or unaligned multi-view clustering, they still suffer from several critical limitations. \textbf{First}, most existing methods treat incomplete and unaligned scenarios as separate problems, employing distinct pipelines for view imputation and correspondence alignment. This two-stage paradigm inevitably leads to error propagation between stages and suboptimal multi-view fusion. \textbf{Second}, many generative approaches, such as diffusion-based IMVC methods \cite{zhangIncompleteMultiviewClustering2025a}, rely on iterative refinement to reconstruct missing views, limiting their efficiency and responsiveness in dynamic or large-scale multi-view scenarios.%recent diffusion-based IMVC methods \cite{zhangIncompleteMultiviewClustering2025a} achieve high-fidelity view generation but require hundreds of iterative denoising steps, resulting in $O(N \cdot r \cdot V \cdot T)$ forward passes for imputing missing views---a prohibitive latency for real-time MVC applications where rapid clustering updates are essential.
 \textbf{Third}, most existing UMVC methods \cite{huangPartiallyViewalignedClustering2020a,xinMultilevelReliableGuidance2025} require explicit correspondence supervision or annotated sample pairs, which is expensive or infeasible when cross-view correspondences are inherently unknown. 
 
-To address the aforementioned limitations, we propose \textbf{OPTION} (\textbf{OP}timal \textbf{T}ransport–Gu\textbf{I}ded Fl\textbf{O}w Matchi\textbf{N}g), a unified framework that tackles all three challenges within a single end-to-end pipeline. Specifically, \textbf{first}, we integrate generation, alignment, and clustering into a unified objective function, where the flow matching module, GW alignment, and soft clustering are jointly optimized end-to-end, eliminating inter-stage error propagation. \textbf{Second}, we employ conditional flow matching \cite{lipmanFlowMatchingGenerative2023a} to learn deterministic transport paths for missing-view imputation, enabling stable manifold-preserving recovery through ODE-based generation with only 10 integration steps---achieving 10-100$\times$ speedup over diffusion models. \textbf{Third}, we introduce a Gromov-Wasserstein (GW) structural coupling loss that aligns intra-view geometric structures in the latent space \textit{without requiring sample correspondences}, enabling alignment-free multi-view fusion for unaligned scenarios. Furthermore, an optional contrastive regularization is incorporated to enhance cross-view consistency specifically for aligned settings.
+To address the aforementioned limitations, we propose \textbf{OPTION} (\textbf{OP}timal \textbf{T}ransport–Gu\textbf{I}ded Fl\textbf{O}w Matchi\textbf{N}g), a unified framework that tackles all three challenges within a single end-to-end pipeline. Specifically, \textbf{first}, we integrate generation, alignment, and clustering into a unified objective function, where the flow matching module, Gromov-Wasserstein (GW)  alignment, and soft clustering are jointly optimized end-to-end, eliminating inter-stage error propagation. \textbf{Second}, we employ conditional flow matching \cite{lipmanFlowMatchingGenerative2023a} to learn deterministic transport paths for missing-view imputation, enabling stable manifold-preserving recovery through ODE-based generation with only 10 integration steps---achieving 10-100$\times$ speedup over diffusion models. \textbf{Third}, we introduce a GW structural coupling loss that aligns intra-view geometric structures in the latent space \textit{without requiring sample correspondences}, enabling alignment-free multi-view fusion for unaligned scenarios. Furthermore, an optional contrastive regularization is incorporated to enhance cross-view consistency specifically for aligned settings.
 In summary, our contributions are as follows:
 \begin{itemize}
     \item We propose OPTION, a unified framework that addresses both incomplete and unaligned multi-view clustering through flow matching, achieving deterministic inference with significantly lower latency than diffusion-based methods.
@@ -224,7 +224,7 @@ $\mathcal{L}_{rec} = \sum_v \|\mathbf{X}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^
 \subsection{Experimental Setup}
 \label{subsec:setup}
 
-\textbf{Datasets.} We conduct experiments on five widely used multi-view benchmarks: Bdgp, Coil20, CUB, Handwritten and Nuswide.
+\textbf{Datasets.} We conduct experiments on five widely used multi-view benchmarks: Bdgp, Coil20, CUB and Nuswide.
 
 \textbf{Baselines.} We compare OPTION with SOTA Incomplete/Unaligned MVC Incomplete/Unaligned MVC methods, including COMPLETER \cite{linCOMPLETERIncompleteMultiview2021}, SURE \cite{yangRobustMultiViewClustering2023}, DealMVC \cite{yangDealMVCDualContrastive2023}, the diffusion-based DCG \cite{zhangIncompleteMultiviewClustering2025a}, MRG-UMC \cite{xinMultilevelReliableGuidance2025}, CANDY \cite{guoRobustContrastiveMultiview2024}, MFLVC \cite{xuMultilevelFeatureLearning2022}, GCFAggMVC \cite{yanGCFAggGlobalCrossView2023}, FreeCSL \cite{daiImputationfreeAlignmentfreeIncomplete2025a}, ROLL \cite{sunROLLRobustNoisy2025} and PROTOCOL \cite{xuePROTOCOLPartialOptimal2025}.
 
@@ -468,10 +468,9 @@ To demonstrate the optimization stability and convergence properties of OPTION, 
 \textbf{Implications.} These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning.
 
 % ----------------------------------------------------------------------
-\subsection{Visualization and Efficiency}
+\subsection{Visualization}
 \label{subsec:vis_efficiency}
-
-\textbf{Latent Space Visualization.} Figure \ref{fig:tsne} visualizes the latent representations using t-SNE at the beginning and end of training on two datasets. Initially (Epoch 0), representations are randomly distributed with heavily overlapping clusters. After training, clusters become compact and well-separated: Handwritten achieves 96.0\% accuracy (from 33.9\%), and Scene-15 reaches 42.3\% (from 17.3\%). The visualization demonstrates that our clustering-guided flow matching effectively learns discriminative representations.
+ Figure \ref{fig:tsne} visualizes the latent representations using t-SNE at the beginning and end of training on two datasets. Initially (Epoch 0), representations are randomly distributed with heavily overlapping clusters. After training, clusters become compact and well-separated: Handwritten achieves 96.0\% accuracy (from 33.9\%), and Scene-15 reaches 42.3\% (from 17.3\%). The visualization demonstrates that our clustering-guided flow matching effectively learns discriminative representations.
 
 \begin{figure}[!htbp]
     \centering
@@ -498,7 +497,8 @@ To demonstrate the optimization stability and convergence properties of OPTION, 
     \label{fig:tsne}
 \end{figure}
 
-\textbf{Inference Speed.} We compare the wall-clock time for sampling/imputation between OPTION and the diffusion-based DCG baseline. Both methods use the same batch size (256) and are evaluated on identical hardware (NVIDIA RTX 3090).
+\subsection{Efficiency of Flow Matching vs. Diffusion}
+We compare the wall-clock time for sampling/imputation between OPTION and the diffusion-based DCG baseline. Both methods use the same batch size (256) and are evaluated on identical hardware (NVIDIA RTX 3090).
 
 \begin{table}[!htbp]
 \centering
@@ -528,9 +528,9 @@ CUB & 2.63 & 25.96 & 9.9× \\
 % ----------------------------------------------------------------------
 \section{Conclusion}\label{conclusion}
 
-We presented OPTION, a unified framework for incomplete and unaligned multi-view clustering that integrates optimal transport-guided flow matching with Gromov-Wasserstein structural alignment. By learning deterministic transport paths with only 10 ODE steps, OPTION achieves 8$\times$ speedup over diffusion-based methods while maintaining high imputation fidelity. The GW loss enables alignment-free multi-view fusion without requiring explicit sample correspondences. Extensive experiments demonstrate that OPTION consistently outperforms state-of-the-art methods across ideal, incomplete, and unaligned scenarios with robust hyperparameter stability.
+This paper introduced OPTION, a unified framework for incomplete and unaligned multi-view clustering that integrates optimal transport-guided flow matching with Gromov-Wasserstein structural alignment. By learning deterministic transport paths with only 10 ODE steps, OPTION achieves 8$\times$ speedup over diffusion-based methods while maintaining high imputation fidelity. The GW loss enables alignment-free multi-view fusion without requiring explicit sample correspondences. Extensive experiments demonstrate that OPTION consistently outperforms state-of-the-art methods across ideal, incomplete, and unaligned scenarios with robust hyperparameter stability.
 
-\textbf{Limitations.} Future work includes extending to scenarios with noisy views and scaling to settings with many views where pairwise GW computation may become expensive.
+%\textbf{Limitations.} Future work includes extending to scenarios with noisy views and scaling to settings with many views where pairwise GW computation may become expensive.
 
 
 % In this paper, we presented OPTION, a unified framework for incomplete and unaligned multi-view clustering that integrates optimal transport-guided flow matching with structural alignment. Our approach addresses three key limitations of existing methods: (1) the separation of view imputation and correspondence alignment into distinct pipelines, (2) the prohibitive computational cost of diffusion-based generative models, and (3) the reliance on explicit sample correspondences for cross-view alignment.
@@ -575,7 +575,7 @@ This enables efficient training without ODE simulation, and at inference, the le
 \section{Training Algorithm}
 \label{app:algorithm}
 
-\begin{algorithm}[tb]
+\begin{algorithm}[!htbp]
   \caption{End-to-End Training for OPTION}
   \label{alg:option}
   \begin{algorithmic}
@@ -677,7 +677,12 @@ Flow Hidden Dim       & [128, 512]    & 0.019 & 192   & 0.397$\pm$0.009 \\
 \textbf{Architecture Parameters.} Both latent dimension and flow hidden dimension exhibit low sensitivity ($S < 0.05$), suggesting that OPTION's performance is robust to architectural choices within reasonable ranges. The optimal latent dimension of 32 is notably smaller than the default value of 128, suggesting potential for computational savings without performance degradation.
 
 \textbf{Training Parameters.} Learning rate and dropout show the lowest sensitivity among examined parameters, indicating that standard training practices (learning rate $\approx 10^{-3}$, minimal or no dropout) work well across different configurations.
-
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/sensitivity_full_9panel.pdf}
+    \caption{Complete sensitivity analysis for all nine hyperparameters on Scene-15. Each subplot shows ACC as a function of parameter value with $\pm$1 std error bands. Red stars indicate optimal values.}
+    \label{fig:sensitivity_full}
+\end{figure*}
 \subsection{Correlation Analysis}
 
 We compute Pearson correlation coefficients between parameter values and ACC to identify monotonic relationships:
@@ -687,11 +692,5 @@ We compute Pearson correlation coefficients between parameter values and ACC to 
     \item \textbf{Non-monotonic relationships}: $\lambda_{gw}$ ($r = 0.23$, $p = 0.58$), $\lambda_{cluster}$ ($r = 0.49$, $p = 0.22$), and ODE steps ($r = -0.20$, $p = 0.67$) show weak correlations with high p-values, indicating optimal performance at intermediate values rather than extremes.
 \end{itemize}
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\textwidth]{figures/sensitivity_full_9panel.pdf}
-    \caption{Complete sensitivity analysis for all nine hyperparameters on Scene-15. Each subplot shows ACC as a function of parameter value with $\pm$1 std error bands. Red stars indicate optimal values.}
-    \label{fig:sensitivity_full}
-\end{figure}
 
 \end{document}
