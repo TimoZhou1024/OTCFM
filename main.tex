@@ -110,7 +110,6 @@ Although these methods have achieved promising performance in incomplete or unal
 \textbf{Third}, most existing UMVC methods \cite{huangPartiallyViewalignedClustering2020a,xinMultilevelReliableGuidance2025} require explicit correspondence supervision or annotated sample pairs, which is expensive or infeasible when cross-view correspondences are inherently unknown. 
 
 To address the aforementioned limitations, we propose \textbf{OPTION} (\textbf{OP}timal \textbf{T}ransport–Gu\textbf{I}ded Fl\textbf{O}w Matchi\textbf{N}g), a unified framework that tackles all three challenges within a single end-to-end pipeline. Specifically, \textbf{first}, we integrate generation, alignment, and clustering into a unified objective function, where the flow matching module, GW alignment, and soft clustering are jointly optimized end-to-end, eliminating inter-stage error propagation. \textbf{Second}, we employ conditional flow matching \cite{lipmanFlowMatchingGenerative2023a} to learn deterministic transport paths for missing-view imputation, enabling stable manifold-preserving recovery through ODE-based generation with only 10 integration steps---achieving 10-100$\times$ speedup over diffusion models. \textbf{Third}, we introduce a Gromov-Wasserstein (GW) structural coupling loss that aligns intra-view geometric structures in the latent space \textit{without requiring sample correspondences}, enabling alignment-free multi-view fusion for unaligned scenarios. Furthermore, an optional contrastive regularization is incorporated to enhance cross-view consistency specifically for aligned settings.
-
 In summary, our contributions are as follows:
 \begin{itemize}
     \item We propose OPTION, a unified framework that addresses both incomplete and unaligned multi-view clustering through flow matching, achieving deterministic inference with significantly lower latency than diffusion-based methods.
@@ -420,7 +419,7 @@ To verify the effectiveness of each component, we conduct ablation studies on Sc
 
 \begin{table}[!htbp]
 \centering
-\caption{Ablation study on Scene-15 (missing rate = 0.7, unaligned rate = 0.5). Each row removes one component from the full model. Best results are in \textbf{bold}.}
+\caption{Ablation study on Scene-15. Best results are in \textbf{bold}.}
 \label{tab:ablation}
 \vskip 0.1in
 \renewcommand{\arraystretch}{1.1}
@@ -472,15 +471,13 @@ We investigate the robustness of OPTION to hyperparameter variations by analyzin
 % }
 % \vskip -0.1in
 % \end{table}
-
-\textbf{Key Findings.} (1) \emph{Overall robustness}: All nine hyperparameters exhibit low sensitivity scores ($S < 0.1$), indicating that OPTION maintains stable clustering performance across a wide range of configurations. Even $\lambda_{gw}$, which shows the largest variation ($S=0.086$), only causes $<9\%$ relative performance change when varied over two orders of magnitude. (2) \emph{Efficient ODE integration}: Performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This allows $5\times$--$10\times$ faster inference compared to diffusion-based alternatives requiring 50--100 steps. (3) \emph{Loss weight stability}: $\lambda_{cluster}$ and $\lambda_{recon}$ show minimal sensitivity ($S \approx 0.05$), confirming that OPTION tolerates a broad range of loss weight configurations without significant performance degradation. (4) \emph{Architecture insensitivity}: Latent dimension, flow hidden dimension, learning rate, and dropout all show very low sensitivity ($S < 0.05$), demonstrating that OPTION's performance stems from its principled formulation rather than architectural tuning.
-
 \begin{figure}[!htbp]
     \centering
     \centerline{\includegraphics[width=\columnwidth]{figures/sensitivity_main_4panel.pdf}}
-    \caption{Sensitivity analysis of four hyperparameters on Scene-15. Shaded regions indicate $\pm$1 std across 5 runs. All parameters show stable ACC within reasonable ranges: (a) $\lambda_{gw}$: robust in [0.05, 0.5]; (b) $\lambda_{cluster}$: stable in [0.5, 5.0]; (c) $\lambda_{recon}$: flat response in [0.3, 2.0]; (d) ODE steps: saturates at $N=10$.}
+    \caption{Sensitivity analysis of four key hyperparameters on Scene-15 (mean $\pm$ std, 5 runs).}
     \label{fig:sensitivity}
 \end{figure}
+\textbf{Key Findings.} (1) \emph{Overall robustness}: All nine hyperparameters exhibit low sensitivity scores ($S < 0.1$), indicating that OPTION maintains stable clustering performance across a wide range of configurations. Even $\lambda_{gw}$, which shows the largest variation ($S=0.086$), only causes $<9\%$ relative performance change when varied over two orders of magnitude. (2) \emph{Efficient ODE integration}: Performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This allows $5\times$--$10\times$ faster inference compared to diffusion-based alternatives requiring 50--100 steps. (3) \emph{Loss weight stability}: $\lambda_{cluster}$ and $\lambda_{recon}$ show minimal sensitivity ($S \approx 0.05$), confirming that OPTION tolerates a broad range of loss weight configurations without significant performance degradation. (4) \emph{Architecture insensitivity}: Latent dimension, flow hidden dimension, learning rate, and dropout all show very low sensitivity ($S < 0.05$), demonstrating that OPTION's performance stems from its principled formulation rather than architectural tuning.
 
 \textbf{Practical Implications.} The low sensitivity across all hyperparameters suggests that OPTION can be deployed with default settings in most scenarios without extensive tuning. For practitioners, we recommend: $\lambda_{gw} \in [0.05, 0.2]$, $N=10$ ODE steps, $\lambda_{cluster} \in [1.0, 3.0]$, and $\lambda_{recon} \in [0.5, 1.5]$. Complete results for all nine parameters are provided in Appendix~\ref{app:sensitivity}.
 
@@ -493,7 +490,7 @@ To demonstrate the optimization stability and convergence properties of OPTION, 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{figures/handwritten_multi_seed_convergence.pdf}
-    \caption{Convergence analysis on the Handwritten dataset (mean $\pm$ std across 5 runs). Top: Clustering metrics (ACC, NMI, ARI) progression throughout training, with shaded regions indicating standard deviation. Bottom: Loss component evolution, including total loss and individual objectives (reconstruction, GW alignment, clustering). All metrics show stable convergence with low variance across seeds.}
+    \caption{Convergence analysis on Handwritten (mean $\pm$ std, 5 runs). Top: clustering metrics; Bottom: loss components.}
     \label{fig:convergence}
 \end{figure}
 
@@ -513,23 +510,26 @@ To demonstrate the optimization stability and convergence properties of OPTION, 
 
 \begin{figure}[!htbp]
     \centering
-    \begin{subfigure}{0.24\columnwidth}
+    \begin{subfigure}{0.48\columnwidth}
         \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch0.png}
         \caption{Handwritten (Init)}
     \end{subfigure}
-    \begin{subfigure}{0.24\columnwidth}
+    \begin{subfigure}{0.48\columnwidth}
         \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch100.png}
         \caption{Handwritten (Final)}
     \end{subfigure}
-    \begin{subfigure}{0.24\columnwidth}
+    
+    \vspace{0.5em}
+    
+    \begin{subfigure}{0.48\columnwidth}
         \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch0.png}
         \caption{Scene-15 (Init)}
     \end{subfigure}
-    \begin{subfigure}{0.24\columnwidth}
+    \begin{subfigure}{0.48\columnwidth}
         \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch100.png}
         \caption{Scene-15 (Final)}
     \end{subfigure}
-    \caption{t-SNE visualization of latent representations before and after training. Top row: Handwritten (33.9\%$\to$96.0\%). Bottom row: Scene-15 (17.3\%$\to$42.3\%). Colors represent ground-truth classes.}
+    \caption{t-SNE visualization of latent representations before and after training.}
     \label{fig:tsne}
 \end{figure}
 
@@ -537,7 +537,7 @@ To demonstrate the optimization stability and convergence properties of OPTION, 
 
 \begin{table}[!htbp]
 \centering
-\caption{Inference speed comparison on diverse multi-view datasets. OPTION uses 10 ODE integration steps while DCG uses 100 diffusion denoising steps. Wall-clock times measured on NVIDIA RTX 3090 with batch size 256.}
+\caption{Inference speed comparison (ms per batch). OPTION uses 10 ODE steps; DCG uses 100 diffusion steps.}
 \label{tab:inference_speed}
 \vskip 0.1in
 \resizebox{\linewidth}{!}{%
@@ -560,6 +560,22 @@ CUB & 2.63 & 25.96 & 9.9× \\
 
 \textbf{Analysis:} OPTION achieves $6.4\times$ to $9.9\times$ speedup over DCG (average 8.0×) due to: (1) straight OT paths requiring only 10 ODE steps vs. 100 diffusion denoising iterations; (2) deterministic ODEs vs. stochastic sampling; (3) minimal fixed memory footprint across all datasets. The speedup is remarkably consistent across datasets of varying complexity, demonstrating that flow matching's efficiency advantage is robust to different data characteristics. For practical deployment, this translates to: on a single RTX 3090, OPTION imputes 256-sample batches in approximately 3 ms, enabling real-time clustering updates at over 300 batches/second, whereas DCG requires $\sim$26 ms per batch ($\sim$38 batches/second), making it less suitable for streaming or interactive scenarios.
 
+% ----------------------------------------------------------------------
+\section{Conclusion}\label{conclusion}
+
+We presented OPTION, a unified framework for incomplete and unaligned multi-view clustering that integrates optimal transport-guided flow matching with Gromov-Wasserstein structural alignment. By learning deterministic transport paths with only 10 ODE steps, OPTION achieves 8$\times$ speedup over diffusion-based methods while maintaining high imputation fidelity. The GW loss enables alignment-free multi-view fusion without requiring explicit sample correspondences. Extensive experiments demonstrate that OPTION consistently outperforms state-of-the-art methods across ideal, incomplete, and unaligned scenarios with robust hyperparameter stability.
+
+\textbf{Limitations.} Future work includes extending to scenarios with noisy views and scaling to settings with many views where pairwise GW computation may become expensive.
+
+
+% In this paper, we presented OPTION, a unified framework for incomplete and unaligned multi-view clustering that integrates optimal transport-guided flow matching with structural alignment. Our approach addresses three key limitations of existing methods: (1) the separation of view imputation and correspondence alignment into distinct pipelines, (2) the prohibitive computational cost of diffusion-based generative models, and (3) the reliance on explicit sample correspondences for cross-view alignment.
+
+% The core innovations of OPTION include: (i) a conditional flow matching mechanism that learns deterministic transport paths for missing-view imputation, enabling high-fidelity generation with only 10 ODE integration steps—achieving 8$\times$ average speedup over diffusion-based alternatives; (ii) a Gromov-Wasserstein structural coupling loss that enforces cross-view geometric consistency without requiring sample correspondences, making it naturally applicable to unaligned scenarios; and (iii) a unified end-to-end optimization framework that jointly learns generation, alignment, and clustering, eliminating inter-stage error propagation.
+
+% Extensive experiments on benchmark datasets demonstrate that OPTION consistently outperforms state-of-the-art methods across ideal, incomplete, and unaligned multi-view clustering scenarios. The ablation studies confirm the contribution of each component, while sensitivity analysis reveals that OPTION maintains stable performance across a wide range of hyperparameter configurations. The convergence analysis further validates the optimization stability and reproducibility of our approach.
+
+% \textbf{Limitations and Future Work.} While OPTION demonstrates strong performance, several directions merit further exploration: (1) extending the framework to handle more than two simultaneous challenges (e.g., noisy views combined with missingness and misalignment); (2) investigating adaptive mechanisms for automatically balancing loss weights based on data characteristics; (3) scaling to scenarios with a large number of views where pairwise GW computation may become expensive. We believe these extensions will further broaden the applicability of flow matching-based approaches to real-world multi-view learning problems.
+
 
 \bibliography{ref}
 \bibliographystyle{icml2026}
@@ -581,9 +597,10 @@ Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} provides a simulatio
 Solving this ODE forward from $t=0$ to $t=1$ generates samples: $\mathbf{z}_1 = \mathbf{z}_0 + \int_0^1 u_t(\mathbf{z}_t) dt$. The distribution evolves according to the continuity equation $\frac{\partial p_t}{\partial t} + \nabla \cdot (p_t u_t) = 0$, ensuring $p_0$ is transported to $p_1$.
 
 \textbf{Conditional Flow Matching.} Directly learning $u_t$ requires access to $p_t$ at all intermediate times, which is intractable. The Conditional Flow Matching (CFM) objective \cite{lipmanFlowMatchingGenerative2023a} bypasses this by conditioning on data samples $\mathbf{x}_1 \sim p_1$. For each data point $\mathbf{x}_1$, we define a conditional probability path $p_t(\mathbf{z}|\mathbf{x}_1)$ that interpolates between noise $\mathbf{x}_0 \sim \mathcal{N}(0, I)$ and $\mathbf{x}_1$. The conditional vector field $u_t(\mathbf{z}|\mathbf{x}_1)$ generates straight trajectories:
-\[
-u_t(\mathbf{z}|\mathbf{x}_1) = \frac{\mathbf{x}_1 - (1-\sigma_{min})\mathbf{x}_0}{1 - (1-\sigma_{min})t}, \quad \mathbf{z}_t = (1 - (1-\sigma_{min})t)\mathbf{x}_0 + t\mathbf{x}_1
-\]
+\begin{align*}
+u_t(\mathbf{z}|\mathbf{x}_1) = & \frac{\mathbf{x}_1 - (1-\sigma_{min})\mathbf{x}_0}{1 - (1-\sigma_{min})t} \\
+\quad \mathbf{z}_t = & (1 - (1-\sigma_{min})t)\mathbf{x}_0 + t\mathbf{x}_1    
+\end{align*}
 where $\sigma_{min} > 0$ is a small regularization constant. The neural network $v_\theta(\mathbf{z}, t)$ is trained via:
 \[
 \mathcal{L}_{CFM}(\theta) = \mathbb{E}_{t, \mathbf{x}_1, \mathbf{x}_0, \mathbf{z}_t} \| v_\theta(\mathbf{z}_t, t) - u_t(\mathbf{z}_t|\mathbf{x}_1) \|^2
@@ -667,7 +684,7 @@ We compute Pearson correlation coefficients between parameter values and ACC to 
     \item \textbf{Non-monotonic relationships}: $\lambda_{gw}$ ($r = 0.23$, $p = 0.58$), $\lambda_{cluster}$ ($r = 0.49$, $p = 0.22$), and ODE steps ($r = -0.20$, $p = 0.67$) show weak correlations with high p-values, indicating optimal performance at intermediate values rather than extremes.
 \end{itemize}
 
-\begin{figure}[!htbp]
+\begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{figures/sensitivity_full_9panel.pdf}
     \caption{Complete sensitivity analysis for all nine hyperparameters on Scene-15. Each subplot shows ACC as a function of parameter value with $\pm$1 std error bands. Red stars indicate optimal values.}
