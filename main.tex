@@ -124,7 +124,7 @@ In summary, our contributions are as follows:
 Handling missing views is a pivotal challenge in MVC. Early approaches relied on matrix factorization or graph learning to impute missing information implicitly \cite{yangRobustMultiViewClustering2023}. With the advent of deep learning, generative models have become mainstream. Methods like COMPLETER \cite{linCOMPLETERIncompleteMultiview2021} and DeepIMVC \cite{yangDealMVCDualContrastive2023} utilize contrastive learning and prototype alignment to recover missing representations. More recently, Diffusion Models (DMs) \cite{hoDenoisingDiffusionProbabilistic2020b, limScorebasedGenerativeModeling2023} have been introduced to MVC for their superior generation quality. For instance, DCG \cite{zhangIncompleteMultiviewClustering2025a} employs conditional diffusion to generate missing views and enhance clustering compactness. Despite their success, diffusion-based methods suffer from high inference latency due to the iterative denoising process (requiring hundreds of steps) and typically rely on paired data for training, limiting their efficiency and applicability in real-time scenarios.
 
 \textbf{Unaligned Multi-View Learning.} 
-Most MVC algorithms assume a strict one-to-one correspondence across views. When this assumption is violated (i.e., unaligned MVC), performance degrades significantly. Existing solutions usually formulate alignment as a permutation learning problem. PVC \cite{huangPartiallyViewalignedClustering2020a} and its successors employ differentiable matching networks to infer correspondences. Recent works like MRG-UMC \cite{xinMultilevelReliableGuidance2025} and CANDY \cite{guoRobustContrastiveMultiview2024a} introduce multi-level guidance and robust contrastive learning to handle noisy or unpaired data. However, these methods often involve solving the assignment problem (e.g., via the Hungarian algorithm), which scales poorly ($O(N^3)$) with dataset size. Furthermore, they typically treat alignment and clustering as separate stages or alternating objectives, lacking a unified framework to handle structural misalignment implicitly.
+Most MVC algorithms assume a strict one-to-one correspondence across views. When this assumption is violated (i.e., unaligned MVC), performance degrades significantly. Existing solutions usually formulate alignment as a permutation learning problem. PVC \cite{huangPartiallyViewalignedClustering2020a} and its successors employ differentiable matching networks to infer correspondences. Recent works like MRG-UMC \cite{xinMultilevelReliableGuidance2025} and CANDY \cite{guoRobustContrastiveMultiview2024a} introduce multi-level guidance and robust contrastive learning to handle noisy or unpaired data. Concurrently, RaD-Net \cite{anonymousRadNetReliabilityAware2026} proposes reliability-aware disentanglement to handle noisy view-specific features via Beta Mixture Model gating. However, these methods often involve solving the assignment problem (e.g., via the Hungarian algorithm), which scales poorly ($O(N^3)$) with dataset size. Furthermore, they typically treat alignment and clustering as separate stages or alternating objectives, lacking a unified framework to handle structural misalignment implicitly.
 
 % \textbf{Flow Matching and Optimal Transport.} 
 % Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} has emerged as a simulation-free alternative to diffusion models, learning a deterministic Continuous Normalizing Flow (CNF) by regressing a target vector field. Rectified Flow \cite{liu2023rectifiedflow} and related works further optimize the transport path to be straight, enabling fast sampling with few-step ODE solvers. The connection between FM and Optimal Transport (OT) provides a geometric perspective on distribution alignment. While OT has been applied to domain adaptation, its integration with Flow Matching for unsupervised multi-view clustering—specifically to address incompleteness and misalignment simultaneously—remains unexplored. Our work bridges this gap by leveraging OT-guided flows for efficient imputation and alignment-free fusion.
@@ -207,42 +207,7 @@ $\mathcal{L}_{rec} = \sum_v \|\mathbf{X}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^
 
 \textbf{Training Procedure.} We adopt a three-phase training strategy: (1) \textit{Warm-up I}: train encoder-decoder with $\mathcal{L}_{rec}$ to establish a stable latent manifold; (2) \textit{Warm-up II}: initialize centroids via K-Means and apply single-view DEC loss to develop cluster-separable representations; (3) \textit{Joint Training}: end-to-end optimization with $\mathcal{L}_{tot}$, periodically refining centroids via K-Means.
 
-\textbf{Implementation.} Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), Euler ODE solver with 10 steps. The complete process is in Algorithm~\ref{alg:option}.
-
-\begin{algorithm}[tb]
-  \caption{End-to-End Training for OPTION}
-  \label{alg:option}
-  \begin{algorithmic}
-    \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_g, \lambda_c, \lambda_r, \lambda_t$, Alignment flag \texttt{is\_aligned}.
-    \STATE {\bfseries Initialize:} Encoder-decoder parameters $\phi$, Vector field parameters $\theta$, Cluster centroids $\mathbf{M}$ via K-Means on initial embeddings.
-    \FOR{epoch $= 1$ to $E$}
-    \FOR{each mini-batch $\mathcal{B} \subset \mathcal{X}$}
-        \STATE Encode views: $\mathbf{z}^{(v)} = f_{\phi_v}(\mathbf{x}^{(v)})$ for all views.
-        \IF{\texttt{is\_aligned}}
-            \STATE Compute consensus: $\mathbf{z}^{(c)} = \frac{1}{V}\sum_v \mathbf{z}^{(v)}$.
-            \STATE Condition $\mathbf{c} \gets \mathbf{z}^{(c)}$.
-        \ELSE
-            \STATE \textit{// Unaligned: each view operates independently.}
-            \STATE For each view $v$ and sample $i$:
-            \STATE \quad $q_{ik}^{(v)} = \frac{\exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_k / \tau)}{\sum_j \exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_j / \tau)}$
-            \STATE \quad $k^{*(v)}_i = \argmax_k q_{ik}^{(v)}$
-            \STATE \quad Condition $\mathbf{c}_i^{(v)} \gets \boldsymbol{\mu}_{k^{*(v)}_i}$
-            \STATE \textit{// No cross-view voting: index $i$ has no correspondence.}
-        \ENDIF
-        \STATE Sample noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ and time $t \sim \mathcal{U}[0,1]$.
-        \STATE Compute CFM Loss: $\mathcal{L}_{CFM} = \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - (1-\sigma_{min})\mathbf{z}_0) \|^2$.
-        \STATE Compute GW Alignment Loss $\mathcal{L}_{GW}$ on encoded latents.
-        \STATE Compute Clustering Loss $\mathcal{L}_{clu} = KL(P_{\mathcal{B}} \| Q_{\mathcal{B}})$.
-        \STATE Compute $\mathcal{L}_{rec}$; compute $\mathcal{L}_{con}$ only if \texttt{is\_aligned}.
-        \STATE Update all parameters via Adam with gradient clipping.
-    \ENDFOR
-    \IF{epoch mod $T_{update} = 0$}
-        \STATE Refine centroids $\mathbf{M}$ via K-Means on current embeddings.
-    \ENDIF
-    \ENDFOR
-    \STATE {\bfseries Output:} Trained model, Cluster assignments $\argmax_k q_{ik}$.
-  \end{algorithmic}
-\end{algorithm}
+\textbf{Implementation.} Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), Euler ODE solver with 10 steps. The complete training procedure is provided in Algorithm~\ref{alg:option} (Appendix).
 
 \section{Experiments}
 \label{sec:experiments}
@@ -606,6 +571,44 @@ where $\sigma_{min} > 0$ is a small regularization constant. The neural network 
 \mathcal{L}_{CFM}(\theta) = \mathbb{E}_{t, \mathbf{x}_1, \mathbf{x}_0, \mathbf{z}_t} \| v_\theta(\mathbf{z}_t, t) - u_t(\mathbf{z}_t|\mathbf{x}_1) \|^2
 \]
 This enables efficient training without ODE simulation, and at inference, the learned vector field can be integrated using few-step ODE solvers (e.g., 10 Euler steps).
+
+\section{Training Algorithm}
+\label{app:algorithm}
+
+\begin{algorithm}[tb]
+  \caption{End-to-End Training for OPTION}
+  \label{alg:option}
+  \begin{algorithmic}
+    \STATE {\bfseries Input:} Multi-view data $\mathcal{X}$, Number of clusters $K$, Hyperparameters $\lambda_g, \lambda_c, \lambda_r, \lambda_t$, Alignment flag \texttt{is\_aligned}.
+    \STATE {\bfseries Initialize:} Encoder-decoder parameters $\phi$, Vector field parameters $\theta$, Cluster centroids $\mathbf{M}$ via K-Means on initial embeddings.
+    \FOR{epoch $= 1$ to $E$}
+    \FOR{each mini-batch $\mathcal{B} \subset \mathcal{X}$}
+        \STATE Encode views: $\mathbf{z}^{(v)} = f_{\phi_v}(\mathbf{x}^{(v)})$ for all views.
+        \IF{\texttt{is\_aligned}}
+            \STATE Compute consensus: $\mathbf{z}^{(c)} = \frac{1}{V}\sum_v \mathbf{z}^{(v)}$.
+            \STATE Condition $\mathbf{c} \gets \mathbf{z}^{(c)}$.
+        \ELSE
+            \STATE \textit{// Unaligned: each view operates independently.}
+            \STATE For each view $v$ and sample $i$:
+            \STATE \quad $q_{ik}^{(v)} = \frac{\exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_k / \tau)}{\sum_j \exp(\tilde{\mathbf{z}}_i^{(v)\top} \tilde{\boldsymbol{\mu}}_j / \tau)}$
+            \STATE \quad $k^{*(v)}_i = \argmax_k q_{ik}^{(v)}$
+            \STATE \quad Condition $\mathbf{c}_i^{(v)} \gets \boldsymbol{\mu}_{k^{*(v)}_i}$
+            \STATE \textit{// No cross-view voting: index $i$ has no correspondence.}
+        \ENDIF
+        \STATE Sample noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ and time $t \sim \mathcal{U}[0,1]$.
+        \STATE Compute CFM Loss: $\mathcal{L}_{CFM} = \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - (1-\sigma_{min})\mathbf{z}_0) \|^2$.
+        \STATE Compute GW Alignment Loss $\mathcal{L}_{GW}$ on encoded latents.
+        \STATE Compute Clustering Loss $\mathcal{L}_{clu} = KL(P_{\mathcal{B}} \| Q_{\mathcal{B}})$.
+        \STATE Compute $\mathcal{L}_{rec}$; compute $\mathcal{L}_{con}$ only if \texttt{is\_aligned}.
+        \STATE Update all parameters via Adam with gradient clipping.
+    \ENDFOR
+    \IF{epoch mod $T_{update} = 0$}
+        \STATE Refine centroids $\mathbf{M}$ via K-Means on current embeddings.
+    \ENDIF
+    \ENDFOR
+    \STATE {\bfseries Output:} Trained model, Cluster assignments $\argmax_k q_{ik}$.
+  \end{algorithmic}
+\end{algorithm}
 
 \section{Loss Configuration}
 \label{app:loss_config}
