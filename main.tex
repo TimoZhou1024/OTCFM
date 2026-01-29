@@ -243,8 +243,12 @@ OPTION is implemented in PyTorch. We use an MLP-based encoder-decoder and a cond
 
 We evaluate OPTION under both ideal (complete and aligned) and challenging (incomplete or unaligned) multi-view scenarios to comprehensively assess its robustness and effectiveness. 
 
+% \subsubsection{Incomplete Multi-View Clustering}
+% To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data in each view. Table~\ref{tab:robustness_incomplete} reports clustering accuracy under varying missing rates, from which several trends emerge. As the proportion of missing views increases, the performance of all methods degrades. Nevertheless, OPTION exhibits remarkable stability, with a much slower decline compared to baseline methods. This demonstrates that the proposed Cross-View Flow Matching effectively imputes missing semantics from the available views, preserving clustering quality even under severe incompleteness.
+
 \subsubsection{Incomplete Multi-View Clustering}
-To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data in each view. Table~\ref{tab:robustness_incomplete} reports clustering accuracy under varying missing rates, from which several trends emerge. As the proportion of missing views increases, the performance of all methods degrades. Nevertheless, OPTION exhibits remarkable stability, with a much slower decline compared to baseline methods. This demonstrates that the proposed Cross-View Flow Matching effectively imputes missing semantics from the available views, preserving clustering quality even under severe incompleteness.
+To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data. Table~\ref{tab:robustness_incomplete} yields two key observations. 
+First, OPTION dominates in high-missingness scenarios. On CUB ($70\%$ missing), it achieves $74.7\%$ accuracy, surpassing the second-best SURE by $27.7\%$ and the diffusion-based DCG by $56.5\%$. This is attributed to the conditional flow matching, which generates semantically valid representations. Second, OPTION exhibits superior stability. While baselines degrade sharply (e.g., DCG drops $28.3\%$ on Coil20), OPTION maintains a stable curve (dropping only $2.6\%$). This confirms that the learned optimal transport paths effectively capture intrinsic cross-view correlations.
 
 \begin{table*}[t]
 \caption{Clustering performance (ACC, NMI, ARI) under varying missing rates. Best results are \textbf{bolded} and second best are \underline{underlined}.}
@@ -310,8 +314,11 @@ To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data in ea
 \vskip -0.1in
 \end{table*}
 
+% \subsubsection{Unaligned Multi-View Clustering}
+% Unaligned scenarios are simulated by randomly shuffling the sample indices of one view, with shuffling rates from $0\%$ to $100\%$. Table~\ref{tab:robustness_unaligned} reports the clustering accuracy under varying unaligned rates, revealing the following patterns.
+
 \subsubsection{Unaligned Multi-View Clustering}
-Unaligned scenarios are simulated by randomly shuffling the sample indices of one view, with shuffling rates from $0\%$ to $100\%$. Table~\ref{tab:robustness_unaligned} reports the clustering accuracy under varying unaligned rates, revealing the following patterns.
+Table~\ref{tab:robustness_unaligned} shows that OPTION maintains high performance under misalignment, whereas baselines deteriorate significantly. For example, on BDGP ($60\%$ shuffle), OPTION achieves $46.3\%$ accuracy compared to MFLVC's random-guess level ($20.0\%$), and outperforms the robust baseline MRG-UMC by nearly $10\%$. This validates the critical role of our Gromov-Wasserstein alignment: by enforcing consistency in intra-view geometric topology rather than relying on brittle index correspondences, OPTION ensures robust fusion even when sample alignment is entirely lost.
 
 \begin{table*}[t]
 \caption{Clustering performance (ACC, NMI, ARI) under varying unaligned rates. Best results are \textbf{bolded} and second best are \underline{underlined}.}
@@ -377,7 +384,7 @@ Unaligned scenarios are simulated by randomly shuffling the sample indices of on
 
 
 
-Traditional methods fail catastrophically when alignment is lost. OPTION, equipped with the Gromov-Wasserstein loss, successfully aligns geometric structures without needing point-wise correspondence, maintaining high accuracy even at high unaligned rates.
+% Traditional methods fail catastrophically when alignment is lost. OPTION, equipped with the Gromov-Wasserstein loss, successfully aligns geometric structures without needing point-wise correspondence, maintaining high accuracy even at high unaligned rates.
 
 % ----------------------------------------------------------------------
 \subsection{Ablation Study}
@@ -468,7 +475,7 @@ The bottom panel of Figure~\ref{fig:convergence} shows the evolution of individu
 
 The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) \emph{Fast convergence}: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) \emph{Smooth trajectories}: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) \emph{Consistent variance}: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds.
 
-These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning.
+% These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning.
 
 % ----------------------------------------------------------------------
 \subsection{Visualization}
@@ -553,6 +560,7 @@ This paper introduced OPTION, a unified framework for incomplete and unaligned m
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newpage
 \appendix
+\onecolumn
 
 \section{Preliminaries on Flow Matching}\label{app:flow_matching}
 
@@ -620,7 +628,7 @@ This enables efficient training without ODE simulation, and at inference, the le
 \centering
 \caption{Loss function configuration for different MVC scenarios.}
 \label{tab:loss_config}
-\resizebox{\linewidth}{!}{%
+% \resizebox{\linewidth}{!}{%
 \begin{tabular}{lcc}
 \toprule
 \textbf{Component} & \textbf{Aligned (IMVC)} & \textbf{Unaligned (UMVC)} \\
@@ -633,7 +641,7 @@ $\mathcal{L}_{rec}$ & \checkmark & \checkmark \\
 $\mathcal{L}_{con}$ & \checkmark & $\times$ \\
 \bottomrule
 \end{tabular}
-}
+% }
 \vspace{0.3em}
 \\\footnotesize{The generative CFM loss is always active; only the conditioning source differs.}
 \end{table}
@@ -650,7 +658,7 @@ To comprehensively evaluate the performance of OPTION, we conducted experiments 
 \begin{center}
 \begin{small}
 \begin{sc}
-\resizebox{\columnwidth}{!}{%
+% \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
 Dataset & $N$ & $V$ & $K$ & View Dimensions \\
@@ -663,7 +671,7 @@ NUS-WIDE    & 30,000 & 5 & 31  & [64, 144, 73, 128, 225] \\
 Scene-15    & 4,485  & 3 & 15  & [20, 59, 40] \\
 \bottomrule
 \end{tabular}%
-}
+% }
 \end{sc}
 \end{small}
 \end{center}
@@ -696,7 +704,7 @@ Table~\ref{tab:sensitivity_full} presents the complete sensitivity analysis acro
 \label{tab:sensitivity_full}
 \vskip 0.1in
 \centering
-\resizebox{\linewidth}{!}{%
+% \resizebox{\linewidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
 Parameter & Range & $S$ & Best & ACC$_{\text{best}}$ \\
@@ -712,7 +720,7 @@ $\lambda_{contrastive}$ & [0.01, 1.0] & 0.022 & 0.01  & 0.394$\pm$0.010 \\
 Flow Hidden Dim       & [128, 512]    & 0.019 & 192   & 0.397$\pm$0.009 \\
 \bottomrule
 \end{tabular}%
-}
+% }
 \end{table}
 
 \subsection{Detailed Analysis by Parameter Category}
