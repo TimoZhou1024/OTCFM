@@ -98,7 +98,7 @@ Specifically, OPTION employs conditional flow matching to learn deterministic tr
 
 \section{Introduction}\label{introduction}
 
-Multi-view clustering (MVC) aims to partition samples into distinct groups by integrating complementary information from multiple heterogeneous data sources, and has attracted significant attention in machine learning and data mining communities \cite{chaoSurveyMultiviewClustering2021,chowdhuryDeepMultiviewClustering2025}. However, most existing MVC methods are designed for {ideal} multi-view data, which assumes that all views are {complete} (every sample has observations in all views) and {aligned} (samples across different views have known one-to-one correspondences) \cite{xuMultilevelFeatureLearning2022,zhangLetDataChoose2023,renDynamicWeightedGraph2024}. In real-world applications, such ideal assumptions are often violated. For instance, in medical diagnosis, a patient may have CT scans but lack MRI images due to cost or availability constraints, resulting in {incomplete} views \cite{linCOMPLETERIncompleteMultiview2021}. 
+Multi-view clustering (MVC) aims to partition samples into distinct groups by integrating complementary information from multiple heterogeneous data sources, and has attracted significant attention in machine learning and data mining communities \cite{chaoSurveyMultiviewClustering2021,chowdhuryDeepMultiviewClustering2025,11277376}. However, most existing MVC methods are designed for {ideal} multi-view data, which assumes that all views are {complete} (every sample has observations in all views) and {aligned} (samples across different views have known one-to-one correspondences) \cite{xuMultilevelFeatureLearning2022,zhangLetDataChoose2023,renDynamicWeightedGraph2024}. In real-world applications, such ideal assumptions are often violated. For instance, in medical diagnosis, a patient may have CT scans but lack MRI images due to cost or availability constraints, resulting in {incomplete} views \cite{linCOMPLETERIncompleteMultiview2021}. 
 In social media analysis, user profiles across different platforms (e.g., Twitter and LinkedIn) often lack explicit linking, creating naturally unaligned multi-view scenarios \cite{xinMultilevelReliableGuidance2025}. Consequently, the problem of clustering multi-view data under simultaneous incompleteness and misalignment remains largely unresolved, posing a fundamental challenge to existing multi-view learning paradigms. %%In cross-lingual document clustering, different language versions of documents may not have explicit correspondence annotations, leading to \textit{unaligned} views \cite{huangPartiallyViewalignedClustering2020a}. Similarly,  How to effectively cluster such non-ideal multi-view data---characterized by incompleteness and misalignment---has emerged as a critical research challenge.
 
 To address these challenges, recent studies have increasingly focused on developing effective methods for mining non-ideal multi-view data, thereby enabling robust multi-view clustering. 
@@ -247,8 +247,8 @@ We evaluate OPTION under both ideal (complete and aligned) and challenging (inco
 % To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data in each view. Table~\ref{tab:robustness_incomplete} reports clustering accuracy under varying missing rates, from which several trends emerge. As the proportion of missing views increases, the performance of all methods degrades. Nevertheless, OPTION exhibits remarkable stability, with a much slower decline compared to baseline methods. This demonstrates that the proposed Cross-View Flow Matching effectively imputes missing semantics from the available views, preserving clustering quality even under severe incompleteness.
 
 \subsubsection{Incomplete Multi-View Clustering}
-To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data. Table~\ref{tab:robustness_incomplete} yields two key observations. 
-First, OPTION dominates in high-missingness scenarios. On CUB ($70\%$ missing), it achieves $74.7\%$ accuracy, surpassing the second-best SURE by $27.7\%$ and the diffusion-based DCG by $56.5\%$. This is attributed to the conditional flow matching, which generates semantically valid representations. Second, OPTION exhibits superior stability. While baselines degrade sharply (e.g., DCG drops $28.3\%$ on Coil20), OPTION maintains a stable curve (dropping only $2.6\%$). This confirms that the learned optimal transport paths effectively capture intrinsic cross-view correlations.
+To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data. Table~\ref{tab:robustness_incomplete} yields two key observations. First, OPTION achieves state-of-the-art performance in high-missingness scenarios. On CUB with $70\%$ of views missing, it reaches $74.7\%$ clustering accuracy, outperforming the second-best SURE by $27.7\%$ and the diffusion-based DCG by $56.5\%$. This improvement can be attributed to conditional flow matching, which generates semantically coherent latent representations even from incomplete inputs. Second, OPTION exhibits remarkable stability across missing rates. While baseline methods degrade sharply—for example, DCG drops by $28.3\%$ on Coil20—OPTION maintains a nearly flat performance curve, with only a $2.6\%$ decline. These results indicate that the learned optimal transport paths effectively capture intrinsic cross-view correlations, enabling robust multi-view fusion under severe incompleteness.
+%First, OPTION dominates in high-missingness scenarios. On CUB ($70\%$ missing), it achieves $74.7\%$ accuracy, surpassing the second-best SURE by $27.7\%$ and the diffusion-based DCG by $56.5\%$. This is attributed to the conditional flow matching, which generates semantically valid representations. Second, OPTION exhibits superior stability. While baselines degrade sharply (e.g., DCG drops $28.3\%$ on Coil20), OPTION maintains a stable curve (dropping only $2.6\%$). This confirms that the learned optimal transport paths effectively capture intrinsic cross-view correlations.
 
 \begin{table*}[t]
 \caption{Clustering performance (ACC, NMI, ARI) under varying missing rates. Best results are \textbf{bolded} and second best are \underline{underlined}.}
@@ -418,7 +418,7 @@ Full model & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\check
 \vskip -0.1in
 \end{table}
 
-Table~\ref{tab:ablation} reveals several important findings. (1) Removing $\mathcal{L}_{contra}$ or $\mathcal{L}_{cluster}$ causes the largest performance drops (ACC $\downarrow$12.2\% and $\downarrow$11.0\%), demonstrating that contrastive learning and clustering supervision are critical for discriminative representations. (2) Removing $\mathcal{L}_{recon}$ degrades ACC by 5.1\%, confirming reconstruction loss helps preserve view-specific information. (3) Removing $\mathcal{L}_{GW}$ or $\mathcal{L}_{flow}$ leads to moderate drops (ACC $\downarrow$1.1--1.2\%), validating their roles in structural alignment and missing-view imputation under challenging conditions.
+Table~\ref{tab:ablation} reveals several important findings. (1) Removing $\mathcal{L}_{contra}$ or $\mathcal{L}_{cluster}$ causes the largest performance drops (ACC drops by 12.2\% and 11.0\%, respectively), demonstrating that contrastive learning and clustering supervision are critical for discriminative representations. (2) Removing $\mathcal{L}_{recon}$ degrades ACC by 5.1\%, confirming reconstruction loss helps preserve view-specific information. (3) Removing $\mathcal{L}_{GW}$ or $\mathcal{L}_{flow}$ leads to moderate drops (ACC drops by 1.1--1.2\%), validating their roles in structural alignment and missing-view imputation under challenging conditions.
 
 % ----------------------------------------------------------------------
 \subsection{Sensitivity Analysis}
@@ -473,14 +473,14 @@ The multi-seed experiments demonstrate OPTION's robustness: all clustering metri
 
 The bottom panel of Figure~\ref{fig:convergence} shows the evolution of individual loss components. All losses decrease monotonically with small variance bands, indicating: (i) no single objective dominates the optimization; (ii) the multi-task learning is well-balanced across reconstruction ($\mathcal{L}_{recon}$), GW alignment ($\mathcal{L}_{gw}$), and clustering ($\mathcal{L}_{cluster}$) objectives. The tight variance bands confirm that OPTION's optimization landscape is well-conditioned across different random seeds.
 
-The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) \emph{Fast convergence}: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) \emph{Smooth trajectories}: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) \emph{Consistent variance}: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds.
+The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) \emph{Fast convergence}: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) \emph{Smooth trajectories}: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) \emph{Consistent variance}: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds. Additional convergence results on COIL-20, CUB, and Scene-15 are provided in Appendix~\ref{app:convergence}.
 
 % These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning.
 
 % ----------------------------------------------------------------------
 \subsection{Visualization}
 \label{subsec:vis_efficiency}
- Figure \ref{fig:tsne} visualizes the latent representations using t-SNE at the beginning and end of training on two datasets. Initially (Epoch 0), representations are randomly distributed with heavily overlapping clusters. After training, clusters become compact and well-separated: Handwritten achieves 96.0\% accuracy (from 33.9\%), and Scene-15 reaches 42.3\% (from 17.3\%). The visualization demonstrates that our clustering-guided flow matching effectively learns discriminative representations.
+ Figure \ref{fig:tsne} visualizes the latent representations using t-SNE at the beginning and end of training on two datasets. Initially (Epoch 0), representations are randomly distributed with heavily overlapping clusters. After training, clusters become compact and well-separated: Handwritten achieves 96.0\% accuracy (from 33.9\%), and Scene-15 reaches 42.3\% (from 17.3\%). Additional visualizations for all five datasets are provided in Appendix~\ref{app:tsne}.
 
 \begin{figure}[!htbp]
     \centering
@@ -621,6 +621,7 @@ This enables efficient training without ODE simulation, and at inference, the le
   \end{algorithmic}
 \end{algorithm}
 
+
 \section{Loss Configuration}
 \label{app:loss_config}
 
@@ -746,6 +747,122 @@ We compute Pearson correlation coefficients between parameter values and ACC to 
     \item \textbf{Negative correlations}: Dropout ($r = -0.98$, $p < 0.001$) shows strong negative correlation, confirming that regularization through dropout is unnecessary for this model.
     \item \textbf{Non-monotonic relationships}: $\lambda_{gw}$ ($r = 0.23$, $p = 0.58$), $\lambda_{cluster}$ ($r = 0.49$, $p = 0.22$), and ODE steps ($r = -0.20$, $p = 0.67$) show weak correlations with high p-values, indicating optimal performance at intermediate values rather than extremes.
 \end{itemize}
+
+
+\section{Additional Convergence Analysis}
+\label{app:convergence}
+
+We provide multi-seed convergence analysis for three additional datasets (COIL-20, CUB, Scene-15) to complement the Handwritten results in the main text. Each experiment follows the same protocol: 5 independent runs with random seeds 42--46, tracking clustering metrics (ACC, NMI, ARI) and loss components over 100 training epochs.
+
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/coil20_multi_seed_convergence.pdf}
+        \caption{COIL-20}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/cub_multi_seed_convergence.pdf}
+        \caption{CUB}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/scene15_multi_seed_convergence.pdf}
+        \caption{Scene-15}
+    \end{subfigure}
+    \caption{Multi-seed convergence analysis on additional datasets (mean $\pm$ std, 5 runs). All datasets exhibit stable convergence with tight variance bands, confirming OPTION's optimization robustness across different data characteristics.}
+    \label{fig:convergence_additional}
+\end{figure*}
+
+
+
+As shown in Figure~\ref{fig:convergence_additional}, all three datasets demonstrate consistent convergence patterns: (i) rapid initial improvement within the first 20--30 epochs; (ii) monotonically decreasing loss curves with minimal oscillation; (iii) tight standard deviation bands indicating reproducible optimization. These results confirm that OPTION's favorable convergence properties generalize across datasets with varying numbers of views, clusters, and sample sizes.
+
+
+\section{Complete t-SNE Visualizations}
+\label{app:tsne}
+
+This appendix provides t-SNE visualizations of latent representations before and after training for all five benchmark datasets, demonstrating the convergence of OPTION's learned representations.
+
+\begin{figure*}[t] % [p] 建议改为 p，让它独占一页，或者 [!ht]
+    \centering
+    % Row 1: Handwritten
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch0.png}
+        \caption{Handwritten (Initial): ACC=33.9\%}
+    \end{subfigure}
+    \hspace{0.5cm}
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch100.png}
+        \caption{Handwritten (Final): ACC=95.5\%}
+    \end{subfigure}
+    
+    \vspace{0.8em}
+    
+    % Row 2: Scene-15
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch0.png}
+        \caption{Scene-15 (Initial): ACC=17.3\%}
+    \end{subfigure}
+    \hspace{0.5cm}
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch100.png}
+        \caption{Scene-15 (Final): ACC=42.3\%}
+    \end{subfigure}
+    
+    \vspace{0.8em}
+    
+    % Row 3: BDGP
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/bdgp_tsne_epoch0.png}
+        \caption{BDGP (Initial): ACC=23.6\%}
+    \end{subfigure}
+    \hspace{0.5cm}
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/bdgp_tsne_epoch100.png}
+        \caption{BDGP (Final): ACC=43.1\%}
+    \end{subfigure}
+    
+    % 这里写主标题，说明图片在下一页继续
+    \caption{t-SNE visualization of latent representations across benchmark datasets. (Continued on next page)}
+    \label{fig:tsne_all} % 标签放在第一个环境里
+\end{figure*}
+
+\clearpage % 强制换页
+
+% --- 第二部分：后2行图片 ---
+\begin{figure*}[t] % [t] 放在新页面的顶部
+    \ContinuedFloat % <--- 关键命令：告诉 LaTeX 这是上一个 Figure 的延续，不增加编号
+    \centering
+    
+    % Row 4: CUB
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/cub_tsne_epoch0.png}
+        \caption{CUB (Initial): ACC=26.8\%}
+    \end{subfigure}
+    \hspace{0.5cm}
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/cub_tsne_epoch100.png}
+        \caption{CUB (Final): ACC=66.7\%}
+    \end{subfigure}
+    
+    \vspace{0.8em}
+    
+    % Row 5: NUS-WIDE
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/nus_wide_tsne_epoch0.png}
+        \caption{NUS-WIDE (Initial): ACC=14.0\%}
+    \end{subfigure}
+    \hspace{0.5cm}
+    \begin{subfigure}{0.35\textwidth}
+        \includegraphics[width=\linewidth]{figures/nus_wide_tsne_epoch100.png}
+        \caption{NUS-WIDE (Final): ACC=18.9\%}
+    \end{subfigure}
+    
+    % 这里的标题会显示为 "Figure X: (continued) ..."
+    \caption{(continued) Visualization of latent representations on CUB and NUS-WIDE. The clusters become significantly more compact and separable after training.}
+\end{figure*}
+
 
 
 \end{document}
