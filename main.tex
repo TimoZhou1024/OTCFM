@@ -51,7 +51,7 @@
 
 \usepackage[textsize=tiny]{todonotes}
 
-\icmltitlerunning{OPTION: Optimal Transport–Guided Flow Matching for Incomplete and Unaligned Multi-View Clustering}%Flow Matching with Optimal Transport-Guided Structural Alignment for Incomplete and Unaligned Multi-View Clustering
+\icmltitlerunning{Submission and Formatting Instructions for ICML 2026}%Flow Matching with Optimal Transport-Guided Structural Alignment for Incomplete and Unaligned Multi-View Clustering
 
 \begin{document}
 
@@ -98,34 +98,42 @@ Specifically, OPTION employs conditional flow matching to learn deterministic tr
 
 \section{Introduction}\label{introduction}
 
-Multi-view clustering (MVC) aims to partition samples into distinct groups by integrating complementary information from multiple heterogeneous data sources, and has attracted significant attention in machine learning and data mining communities \cite{chaoSurveyMultiviewClustering2021,chowdhuryDeepMultiviewClustering2025}. However, most existing MVC methods \cite{xuMultilevelFeatureLearning2022,zhangLetDataChoose2023,renDynamicWeightedGraph2024} are designed for {ideal} multi-view data, which assumes that all views are {complete} (every sample has observations in all views) and {aligned} (samples across different views have known one-to-one correspondences). In real-world applications, such ideal assumptions are often violated. For instance, in medical diagnosis, a patient may have CT scans but lack MRI images due to cost or availability constraints, resulting in {incomplete} views \cite{linCOMPLETERIncompleteMultiview2021}. 
+Multi-view clustering (MVC) aims to partition samples into distinct groups by integrating complementary information from multiple heterogeneous data sources, and has attracted significant attention in machine learning and data mining communities \cite{chaoSurveyMultiviewClustering2021,chowdhuryDeepMultiviewClustering2025}. However, most existing MVC methods are designed for {ideal} multi-view data, which assumes that all views are {complete} (every sample has observations in all views) and {aligned} (samples across different views have known one-to-one correspondences) \cite{xuMultilevelFeatureLearning2022,zhangLetDataChoose2023,renDynamicWeightedGraph2024}. In real-world applications, such ideal assumptions are often violated. For instance, in medical diagnosis, a patient may have CT scans but lack MRI images due to cost or availability constraints, resulting in {incomplete} views \cite{linCOMPLETERIncompleteMultiview2021}. 
 In social media analysis, user profiles across different platforms (e.g., Twitter and LinkedIn) often lack explicit linking, creating naturally unaligned multi-view scenarios \cite{xinMultilevelReliableGuidance2025}. Consequently, the problem of clustering multi-view data under simultaneous incompleteness and misalignment remains largely unresolved, posing a fundamental challenge to existing multi-view learning paradigms. %%In cross-lingual document clustering, different language versions of documents may not have explicit correspondence annotations, leading to \textit{unaligned} views \cite{huangPartiallyViewalignedClustering2020a}. Similarly,  How to effectively cluster such non-ideal multi-view data---characterized by incompleteness and misalignment---has emerged as a critical research challenge.
 
 To address these challenges, recent studies have increasingly focused on developing effective methods for mining non-ideal multi-view data, thereby enabling robust multi-view clustering. 
-For the \textit{incomplete} multi-view scenario (IMVC), contrastive learning-based methods \cite{linCOMPLETERIncompleteMultiview2021,yangRobustMultiViewClustering2023,jinDeepIncompleteMultiView2023} dominate recent literature, which recover missing view representations by maximizing cross-view feature consistency through instance-level or prototype-level alignment. More recently, Zhang et al.\ \cite{zhangIncompleteMultiviewClustering2025a} introduced diffusion models to IMVC, leveraging conditional denoising to generate high-fidelity missing views while enhancing clustering compactness. For the \textit{unaligned} multi-view scenario (UMVC), Huang et al.\ \cite{huangPartiallyViewalignedClustering2020a} pioneered the permutation learning paradigm, formulating cross-view alignment as learning a differentiable matching network. Subsequent works \cite{xinMultilevelReliableGuidance2025,guoRobustContrastiveMultiview2024a} further improve robustness by exploiting multi-level structural guidance or noise-tolerant contrastive mechanisms to handle noisy and unpaired correspondences.
+For the incomplete multi-view scenario (IMVC), contrastive learning-based methods \cite{linCOMPLETERIncompleteMultiview2021,yangRobustMultiViewClustering2023,jinDeepIncompleteMultiView2023} dominate recent literature, which recover missing view representations by maximizing cross-view feature consistency through instance-level or prototype-level alignment. More recently, Zhang et al.\ \cite{zhangIncompleteMultiviewClustering2025a} introduced diffusion models to IMVC, leveraging conditional denoising to generate high-fidelity missing views while enhancing clustering compactness. For the unaligned multi-view scenario (UMVC), Huang et al.\ \cite{huangPartiallyViewalignedClustering2020a} pioneered the permutation learning paradigm, formulating cross-view alignment as learning a differentiable matching network. Subsequent works \cite{xinMultilevelReliableGuidance2025,guoRobustContrastiveMultiview2024a} further improve robustness by exploiting multi-level structural guidance or noise-tolerant contrastive mechanisms to handle noisy and unpaired correspondences.
 
 %To address these challenges, recent studies have increasingly focused on the effective clustering of non-ideal multi-view data. For example, in the Incomplete Multi-View Clustering (IMVC) setting, contrastive learning–based methods typically recover missing view representations by maximizing cross-view feature consistency through instance-level or prototype-level alignment \cite{linCOMPLETERIncompleteMultiview2021,yangRobustMultiViewClustering2023,jinDeepIncompleteMultiView2023}. In addition, Zhang et al. \cite{zhangIncompleteMultiviewClustering2025a} and Wen et al. introduced diffusion models into IMVC, leveraging conditional denoising to generate high-fidelity missing views while enhancing cluster compactness. In the Unaligned Multi-View Clustering (UMVC) setting, Huang et al. \cite{huangPartiallyViewalignedClustering2020a} pioneered the permutation learning paradigm, formulating cross-view alignment as the problem of learning a differentiable matching network. Subsequent works \cite{xinMultilevelReliableGuidance2025,guoRobustContrastiveMultiview2024a} further improve the robustness of multi-view clustering by incorporating multi-level structural guidance or noise-tolerant contrastive mechanisms, enabling effective clustering in the presence of noisy and unpaired correspondences.
 
-Although these methods have achieved promising performance in incomplete or unaligned multi-view clustering, they still suffer from several critical limitations. \textbf{First}, most existing methods treat incomplete and unaligned scenarios as separate problems, employing distinct pipelines for view imputation and correspondence alignment. This two-stage paradigm inevitably leads to error propagation between stages and suboptimal multi-view fusion. \textbf{Second}, many generative approaches, such as diffusion-based IMVC methods \cite{zhangIncompleteMultiviewClustering2025a}, rely on iterative refinement to reconstruct missing views, limiting their efficiency and responsiveness in dynamic or large-scale multi-view scenarios.%recent diffusion-based IMVC methods \cite{zhangIncompleteMultiviewClustering2025a} achieve high-fidelity view generation but require hundreds of iterative denoising steps, resulting in $O(N \cdot r \cdot V \cdot T)$ forward passes for imputing missing views---a prohibitive latency for real-time MVC applications where rapid clustering updates are essential.
-\textbf{Third}, most existing UMVC methods \cite{huangPartiallyViewalignedClustering2020a,xinMultilevelReliableGuidance2025} require explicit correspondence supervision or annotated sample pairs, which is expensive or infeasible when cross-view correspondences are inherently unknown. 
+Although these methods have achieved promising performance in incomplete or unaligned multi-view clustering, they still suffer from several critical limitations. First, most existing methods treat incomplete and unaligned scenarios as separate problems, employing distinct pipelines for view imputation and correspondence alignment. This two-stage paradigm inevitably leads to error propagation between stages and suboptimal multi-view fusion. Second, many generative approaches, such as diffusion-based IMVC methods \cite{zhangIncompleteMultiviewClustering2025a}, rely on iterative refinement to reconstruct missing views, limiting their efficiency and responsiveness in dynamic or large-scale multi-view scenarios.%recent diffusion-based IMVC methods \cite{zhangIncompleteMultiviewClustering2025a} achieve high-fidelity view generation but require hundreds of iterative denoising steps, resulting in $O(N \cdot r \cdot V \cdot T)$ forward passes for imputing missing views---a prohibitive latency for real-time MVC applications where rapid clustering updates are essential.
+Third, most existing UMVC methods \cite{huangPartiallyViewalignedClustering2020a,xinMultilevelReliableGuidance2025} require explicit correspondence supervision or annotated sample pairs, which is expensive or infeasible when cross-view correspondences are inherently unknown. 
 
-To address the aforementioned limitations, we propose \textbf{OPTION} (\textbf{OP}timal \textbf{T}ransport–Gu\textbf{I}ded Fl\textbf{O}w Matchi\textbf{N}g), a unified framework that tackles all three challenges within a single end-to-end pipeline. Specifically, \textbf{first}, we integrate generation, alignment, and clustering into a unified objective function, where the flow matching module, Gromov-Wasserstein (GW)  alignment, and soft clustering are jointly optimized end-to-end, eliminating inter-stage error propagation. \textbf{Second}, we employ conditional flow matching \cite{lipmanFlowMatchingGenerative2023a} to learn deterministic transport paths for missing-view imputation, enabling stable manifold-preserving recovery through ODE-based generation with only 10 integration steps---achieving 10-100$\times$ speedup over diffusion models. \textbf{Third}, we introduce a GW structural coupling loss that aligns intra-view geometric structures in the latent space \textit{without requiring sample correspondences}, enabling alignment-free multi-view fusion for unaligned scenarios. Furthermore, an optional contrastive regularization is incorporated to enhance cross-view consistency specifically for aligned settings.
+To address the aforementioned limitations, this paper proposes \textbf{OPTION} (\textbf{OP}timal \textbf{T}ransport–Gu\textbf{I}ded Fl\textbf{O}w Matchi\textbf{N}g), a unified framework that tackles all three challenges within a single end-to-end pipeline. The framework offers three key innovations. First, generation, alignment, and clustering are integrated into a unified objective function, where the flow matching module, Gromov-Wasserstein (GW) alignment, and soft clustering are jointly optimized end-to-end, eliminating inter-stage error propagation. Second, conditional flow matching \cite{lipmanFlowMatchingGenerative2023a} is employed to learn deterministic transport paths for missing-view imputation, enabling stable manifold-preserving recovery through ODE-based generation with only 10 integration steps---achieving 10-100$\times$ speedup over diffusion models. Third, a GW structural coupling loss is introduced to align intra-view geometric structures in the latent space without requiring sample correspondences, enabling alignment-free multi-view fusion for unaligned scenarios. Furthermore, an optional contrastive regularization is incorporated to enhance cross-view consistency specifically for aligned settings.
 In summary, our contributions are as follows:
 \begin{itemize}
     \item We propose OPTION, a unified framework that addresses both incomplete and unaligned multi-view clustering through flow matching, achieving deterministic inference with significantly lower latency than diffusion-based methods.
-    \item We develop a Gromov-Wasserstein structural coupling loss that enforces cross-view geometric consistency \textit{without requiring sample correspondences}, enabling true alignment-free multi-view learning.
+    \item We develop a Gromov-Wasserstein structural coupling loss that enforces cross-view geometric consistency without requiring sample correspondences, enabling true alignment-free multi-view learning.
     \item We introduce a modular architecture that adaptively activates contrastive learning for aligned data while relying on GW-based structural alignment for unaligned scenarios.
     \item Extensive experiments on benchmark datasets demonstrate that OPTION achieves competitive or superior performance compared to state-of-the-art methods while offering 10-100$\times$ faster inference.
 \end{itemize}
 
 \section{Related Work}\label{related-work}
+Existing multi-view clustering (MVC) methods for imperfect multi-view data can be broadly categorized into two groups: methods for handling missing views and methods for unaligned views.
 
-\textbf{Incomplete MVC and Generative Models.} 
-Handling missing views is a pivotal challenge in MVC. Early approaches relied on matrix factorization or graph learning to impute missing information implicitly \cite{yangRobustMultiViewClustering2023}. With the advent of deep learning, generative models have become mainstream. Methods like COMPLETER \cite{linCOMPLETERIncompleteMultiview2021} and DeepIMVC \cite{yangDealMVCDualContrastive2023} utilize contrastive learning and prototype alignment to recover missing representations. More recently, Diffusion Models (DMs) \cite{hoDenoisingDiffusionProbabilistic2020b, limScorebasedGenerativeModeling2023} have been introduced to MVC for their superior generation quality. For instance, DCG \cite{zhangIncompleteMultiviewClustering2025a} employs conditional diffusion to generate missing views and enhance clustering compactness. Despite their success, diffusion-based methods suffer from high inference latency due to the iterative denoising process (requiring hundreds of steps) and typically rely on paired data for training, limiting their efficiency and applicability in real-time scenarios.
 
-\textbf{Unaligned Multi-View Learning.} 
-Most MVC algorithms assume a strict one-to-one correspondence across views. When this assumption is violated (i.e., unaligned MVC), performance degrades significantly. Existing solutions usually formulate alignment as a permutation learning problem. PVC \cite{huangPartiallyViewalignedClustering2020a} and its successors employ differentiable matching networks to infer correspondences. Recent works like MRG-UMC \cite{xinMultilevelReliableGuidance2025} and CANDY \cite{guoRobustContrastiveMultiview2024a} introduce multi-level guidance and robust contrastive learning to handle noisy or unpaired data. Concurrently, RaD-Net \cite{anonymousRadNetReliabilityAware2026} proposes reliability-aware disentanglement to handle noisy view-specific features via Beta Mixture Model gating. However, these methods often involve solving the assignment problem (e.g., via the Hungarian algorithm), which scales poorly ($O(N^3)$) with dataset size. Furthermore, they typically treat alignment and clustering as separate stages or alternating objectives, lacking a unified framework to handle structural misalignment implicitly.
+\textbf{Incomplete Multi-View Clustering.} Early approaches relied on matrix factorization or graph learning to impute missing information implicitly \cite{yangRobustMultiViewClustering2023}. With the advent of deep learning, sophisticated representation learning techniques have become mainstream. Methods like COMPLETER \cite{linCOMPLETERIncompleteMultiview2021} and DeepIMVC \cite{yangDealMVCDualContrastive2023} utilize contrastive learning and prototype alignment to recover missing representations. Beyond these representation-based approaches, generative models—especially Diffusion Models (DMs) \cite{hoDenoisingDiffusionProbabilistic2020b, limScorebasedGenerativeModeling2023}—have recently been introduced to MVC for their superior generation quality. For instance, DCG \cite{zhangIncompleteMultiviewClustering2025a} employs conditional diffusion to generate missing views and enhance clustering compactness. 
+Despite their success, diffusion-based methods suffer from high inference latency due to the iterative denoising process (requiring hundreds of steps) and typically rely on paired data for training, limiting their efficiency and applicability in real-time scenarios.
 
+\textbf{Unaligned Multi-View Clustering.} Most MVC algorithms assume a strict one-to-one correspondence across views. When this assumption is violated (i.e., unaligned MVC), performance degrades significantly. Existing solutions usually formulate alignment as a permutation learning problem. PVC \cite{huangPartiallyViewalignedClustering2020a} and its successors employ differentiable matching networks to infer correspondences. Recent works like MRG-UMC \cite{xinMultilevelReliableGuidance2025} and CANDY \cite{guoRobustContrastiveMultiview2024a} introduce multi-level guidance and robust contrastive learning to handle noisy or unpaired data. 
+However, these methods often involve solving the assignment problem (e.g., via the Hungarian algorithm), which scales poorly ($O(N^3)$) with dataset size. Furthermore, they typically treat alignment and clustering as separate stages or alternating objectives, lacking a unified framework to handle structural misalignment implicitly.
+
+Additionally, the concurrent work RaD-Net~\cite{anonymousRadNetReliabilityAware2026} uses reliability-aware disentanglement with a Beta Mixture Model to suppress noise in view-specific features. 
+In contrast, our method addresses incomplete and unaligned multi-view clustering via flow matching, differing fundamentally in both scenario and model design. 
+
+% In summary, while significant progress has been made in handling view incompleteness and misalignment independently, critical gaps remain when addressing them jointly. First, most existing approaches treat imputation and alignment as isolated tasks, employing separate pipelines that prevent mutual enhancement and lead to error propagation. Second, state-of-the-art generative solutions (e.g., diffusion models) suffer from prohibitive inference latency, while alignment techniques often rely on computationally expensive combinatorial matching ($O(N^3)$) or explicit correspondence supervision. These limitations underscore the need for a unified paradigm. Unlike prior arts, our OPTION framework integrates efficient deterministic flow matching with implicit Gromov-Wasserstein alignment, enabling robust clustering under simultaneous incompleteness and misalignment without incurring high computational costs.
+
+%Concurrently, RaD-Net \cite{anonymousRadNetReliabilityAware2026} proposes reliability-aware disentanglement to handle noisy view-specific features via Beta Mixture Model gating. 
 % \textbf{Flow Matching and Optimal Transport.} 
 % Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} has emerged as a simulation-free alternative to diffusion models, learning a deterministic Continuous Normalizing Flow (CNF) by regressing a target vector field. Rectified Flow \cite{liu2023rectifiedflow} and related works further optimize the transport path to be straight, enabling fast sampling with few-step ODE solvers. The connection between FM and Optimal Transport (OT) provides a geometric perspective on distribution alignment. While OT has been applied to domain adaptation, its integration with Flow Matching for unsupervised multi-view clustering—specifically to address incompleteness and misalignment simultaneously—remains unexplored. Our work bridges this gap by leveraging OT-guided flows for efficient imputation and alignment-free fusion.
 
@@ -138,9 +146,9 @@ Most MVC algorithms assume a strict one-to-one correspondence across views. When
 
 \subsection{Problem Formulation and Framework Overview}\label{problem-formulation}
 
-Consider a multi-view dataset $\mathcal{X} = \{ \mathbf{X}^{(v)} \}_{v=1}^V$ with $V$ views. A binary mask $\mathbf{M} \in \{0,1\}^{N \times V}$ indicates view availability (\textbf{Incomplete MVC}), and cross-view sample correspondences may be unknown (\textbf{Unaligned MVC}). Our goal is to jointly: (1) impute missing views, (2) align cross-view geometric structures without explicit correspondences, and (3) discover cluster assignments---all within a unified end-to-end framework.
+Consider a multi-view dataset $\mathcal{X} = \{ \mathbf{X}^{(v)} \}_{v=1}^V$ with $V$ views. A binary mask $\mathbf{M} \in \{0,1\}^{N \times V}$ indicates view availability (incomplete MVC), and cross-view sample correspondences may be unknown (unaligned MVC). Our goal is to jointly: (1) impute missing views, (2) align cross-view geometric structures without explicit correspondences, and (3) discover cluster assignments---all within a unified end-to-end framework.
 
-To achieve this, OPTION adopts a \textit{unified generation-alignment-clustering} paradigm with three core components: (1) \textbf{Latent Embedding} projects heterogeneous views into a shared low-dimensional space via view-specific encoder-decoders; (2) \textbf{Gromov-Wasserstein Alignment} enforces cross-view geometric consistency without sample correspondences; (3) \textbf{Conditional Flow Matching} enables efficient missing-view imputation with only 10 ODE steps. Figure~\ref{fig:overview} illustrates the pipeline.
+To achieve this, OPTION adopts a unified generation-alignment-clustering paradigm with three core components: latent embedding that projects heterogeneous views into a shared low-dimensional space via view-specific encoder-decoders; Gromov-Wasserstein alignment that enforces cross-view geometric consistency without sample correspondences; and conditional flow matching that enables efficient missing-view imputation with only 10 ODE steps. Figure~\ref{fig:overview} illustrates the pipeline.
 
 \begin{figure*}[!htbp]
     \centering
@@ -154,60 +162,59 @@ To achieve this, OPTION adopts a \textit{unified generation-alignment-clustering
 To address the high dimensionality and heterogeneity of multi-view data, we project all views into a unified low-dimensional latent space. For each view $v$, a neural encoder $f_{\phi_v}: \mathbb{R}^{d_v} \to \mathbb{R}^{d_z}$ maps the observation $\mathbf{x}_i^{(v)}$ to a latent representation $\mathbf{z}_i^{(v)} = f_{\phi_v}(\mathbf{x}_i^{(v)})$. Symmetric decoders $g_{\psi_v}: \mathbb{R}^{d_z} \to \mathbb{R}^{d_v}$ reconstruct the original views, providing a reconstruction loss $\mathcal{L}_{rec} = \sum_v \|\mathbf{x}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^2$ that regularizes the latent space. This design reduces computational complexity from $O(d_v^2)$ to $O(d_z^2)$ for flow matching operations while enabling meaningful cross-view comparisons in the shared space $\mathbb{R}^{d_z}$.
 
 \subsection{Gromov-Wasserstein Structural Alignment}\label{gw-vector-field}
+A fundamental challenge in unaligned multi-view clustering is that the $i$-th sample in view $v$ may not correspond to the $i$-th sample in view $u$. As a result, conventional alignment strategies—such as contrastive learning or direct feature averaging—are largely inapplicable, since they rely on explicit sample correspondences. To address this, we employ a structural alignment mechanism based on the Gromov-Wasserstein (GW) distance. Unlike the standard Wasserstein distance, which evaluates point-to-point transport costs, GW compares pairwise relational structures: if two samples are close in one view, their counterparts under an optimal coupling should also be close in the other view. This relational perspective enables cross-view alignment without requiring any prior knowledge of explicit correspondences.
 
-\textbf{Motivation.} A central challenge in unaligned multi-view clustering is that the $i$-th sample in view $v$ does not correspond to the $i$-th sample in view $u$. Consequently, conventional alignment strategies---such as contrastive learning or direct feature averaging---are fundamentally inapplicable, as they require explicit sample correspondences. To overcome this limitation, we introduce a \textit{structural alignment} mechanism based on the Gromov-Wasserstein (GW) distance. Unlike standard Wasserstein distance that measures point-to-point transport cost, GW compares two distributions by examining the \textit{preservation of pairwise relationships}: if two samples are close in one view, their counterparts (under an optimal coupling) should also be close in another view. This relational perspective enables cross-view alignment without knowing which samples correspond.
-
-\textbf{Kernel Matrix Construction.} To capture the geometric structure of each view, we construct a pairwise similarity matrix. For each view $v$, we compute an RBF (Radial Basis Function) kernel matrix $\mathbf{K}^{(v)} \in \mathbb{R}^{B \times B}$ within a mini-batch of size $B$:
-\[
+To capture the geometric structure of each view, we construct a pairwise similarity matrix. Specifically, for each view $v$, we compute an RBF (Radial Basis Function) kernel matrix $\mathbf{K}^{(v)} \in \mathbb{R}^{B \times B}$ within a mini-batch of size $B$:
+\begin{align}
 K_{ij}^{(v)} = \exp\left(-\gamma \| \mathbf{z}_i^{(v)} - \mathbf{z}_j^{(v)} \|^2\right)
-\]
+\end{align}
 where $\gamma > 0$ is a bandwidth parameter. The entry $K_{ij}^{(v)}$ quantifies the similarity between the $i$-th and $j$-th samples within view $v$, encoding the local manifold geometry. This kernel formulation is robust to feature scale variations across heterogeneous views.
 
-\textbf{Structural Alignment Loss.} The core insight is that if two views capture the same underlying cluster structure, their kernel matrices should exhibit similar patterns---even when sample indices are shuffled. We formalize this via the GW-inspired loss:
-\[
+The core insight is that if two views capture the same underlying cluster structure, their kernel matrices should exhibit similar patterns---even when sample indices are shuffled. We formalize this via the GW-inspired loss:
+\begin{align}
 \mathcal{L}_{GW} = \frac{2}{V(V-1)} \sum_{v < u} \| \mathbf{K}^{(v)} - \mathbf{K}^{(u)} \|_F^2
-\]
-This loss penalizes discrepancies between the pairwise relationship structures across all view pairs. Intuitively, minimizing $\mathcal{L}_{GW}$ encourages the encoder to learn representations such that the \textit{intra-view geometric structure} becomes consistent across views, thereby achieving implicit alignment without explicit correspondences. Importantly, this batch-wise formulation reduces computational complexity from $O(N^3)$ (full GW optimization) to $O(B^2)$ per mini-batch, making it scalable for large datasets.
+\end{align}
+This loss penalizes discrepancies between the pairwise relationship structures across all view pairs. Intuitively, minimizing $\mathcal{L}_{GW}$ encourages the encoder to learn representations such that the intra-view geometric structure becomes consistent across views, thereby achieving implicit alignment without explicit correspondences. Importantly, this batch-wise formulation reduces computational complexity from $O(N^3)$ (full GW optimization) to $O(B^2)$ per mini-batch, making it scalable for large datasets.
 
 \subsection{Conditional Flow Matching for Imputation}\label{conditional-flow}
+Once the latent space is established, missing view imputation becomes essential for downstream fusion and clustering. While diffusion models have shown strong generative capabilities, their iterative denoising process (typically $T=100\sim1000$ steps) incurs prohibitive latency. Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} offers an efficient alternative by learning a deterministic continuous normalizing flow (CNF) that directly transports samples from a simple prior to the data distribution. The key advantage is that FM enables few-step generation (e.g., 10 steps) while maintaining high sample quality, making it ideal for real-time MVC applications.
 
-\textbf{Motivation.} Missing view imputation is essential for incomplete multi-view clustering, as downstream fusion and clustering require complete representations. While diffusion models have shown strong generative capabilities, their iterative denoising process (typically $T=100\sim1000$ steps) incurs prohibitive latency. Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} offers an efficient alternative by learning a \textit{deterministic} continuous normalizing flow (CNF) that directly transports samples from a simple prior to the data distribution. The key advantage is that FM enables few-step generation (e.g., 10 steps) while maintaining high sample quality, making it ideal for real-time MVC applications.
+Formally, FM learns a time-dependent vector field $v_\theta(\mathbf{z}_t, t)$ that defines an ordinary differential equation (ODE): $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t)$. By integrating this ODE from $t=0$ to $t=1$, samples are transported from noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ to data $\mathbf{z}_1 \sim p_{data}$. Following \cite{lipmanFlowMatchingGenerative2023a}, we adopt optimal transport (OT) paths, which yield straight trajectories $\mathbf{z}_t = (1-t)\mathbf{z}_0 + t\mathbf{z}_1$. The target vector field along this path is simply $u_t = \mathbf{z}_1 - \mathbf{z}_0$, and the network is trained to regress this target.
 
-\textbf{Flow Matching Formulation.} FM learns a time-dependent vector field $v_\theta(\mathbf{z}_t, t)$ that defines an ordinary differential equation (ODE): $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t)$. By integrating this ODE from $t=0$ to $t=1$, samples are transported from noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$ to data $\mathbf{z}_1 \sim p_{data}$. Following \cite{lipmanFlowMatchingGenerative2023a}, we adopt optimal transport (OT) paths, which yield straight trajectories $\mathbf{z}_t = (1-t)\mathbf{z}_0 + t\mathbf{z}_1$. The target vector field along this path is simply $u_t = \mathbf{z}_1 - \mathbf{z}_0$, and the network is trained to regress this target.
+To leverage available semantic information, we extend FM to a conditional formulation: $v_\theta(\mathbf{z}_t, t, \mathbf{c})$, where $\mathbf{c}$ encodes context. In the aligned setting, $\mathbf{c}_i$ is the consensus representation aggregated from available views. In the unaligned setting,  $\mathbf{c}_i^{(v)}$ is set to the cluster centroid determined by soft assignment, ensuring semantically coherent generation while each view operates independently. Cross-view consistency is enforced solely via $\mathcal{L}_{GW}$.
+%For missing view imputation, we extend FM to a \textit{conditional} setting where generation is guided by available semantic information. We learn a conditional vector field $v_\theta(\mathbf{z}_t, t, \mathbf{c})$ where $\mathbf{c}$ provides context about the target sample. The conditioning strategy differs based on the alignment scenario: In the aligned (IMVC) setting where sample correspondences are known, the consensus representation $\mathbf{c}_i = \frac{1}{|\mathcal{V}_{avail}^{(i)}|} \sum_{v \in \mathcal{V}_{avail}^{(i)}} \mathbf{z}_i^{(v)}$ aggregated from available views provides direct semantic guidance. In the unaligned (UMVC) setting where correspondences are unknown, cross-sample averaging is invalid; instead, we condition on the cluster centroid $\mathbf{c}_i^{(v)} = \boldsymbol{\mu}_{k^*}$ where $k^* = \argmax_k q_{ik}^{(v)}$ is determined by soft assignment, ensuring semantically coherent generation while each view operates independently---cross-view consistency is enforced solely through $\mathcal{L}_{GW}$.
 
-\textbf{Conditional Generation.} For missing view imputation, we extend FM to a \textit{conditional} setting where generation is guided by available semantic information. We learn a conditional vector field $v_\theta(\mathbf{z}_t, t, \mathbf{c})$ where $\mathbf{c}$ provides context about the target sample. The conditioning strategy differs based on the alignment scenario: For \textbf{aligned (IMVC)} data where sample correspondences are known, we use the consensus representation $\mathbf{c}_i = \frac{1}{|\mathcal{V}_{avail}^{(i)}|} \sum_{v \in \mathcal{V}_{avail}^{(i)}} \mathbf{z}_i^{(v)}$ aggregated from available views, providing direct semantic guidance. For \textbf{unaligned (UMVC)} data where correspondences are unknown, cross-sample averaging is invalid; instead, we condition on the cluster centroid $\mathbf{c}_i^{(v)} = \boldsymbol{\mu}_{k^*}$ where $k^* = \argmax_k q_{ik}^{(v)}$ is determined by soft assignment, ensuring semantically coherent generation while each view operates independently---cross-view consistency is enforced solely through $\mathcal{L}_{GW}$.
-
-\textbf{Flow Matching Loss.} The training objective minimizes the discrepancy between the predicted and target vector fields:
-\[
+The training objective minimizes the discrepancy between the predicted and target vector fields:
+\begin{align}
 \mathcal{L}_{CFM} = \mathbb{E}_{t, \mathbf{z}_0, \mathbf{z}_1, \mathbf{c}} \left[ \| v_\theta(\mathbf{z}_t, t, \mathbf{c}) - (\mathbf{z}_1 - \mathbf{z}_0) \|^2 \right]
-\]
+\end{align}
 where $t \sim \mathcal{U}[0,1]$, $\mathbf{z}_0 \sim \mathcal{N}(0, I)$, and $\mathbf{z}_1$ is the encoded latent of an observed view.
 
-\textbf{Inference.} At test time, to impute a missing view for sample $i$, we: (1) sample initial noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$; (2) construct conditioning $\mathbf{c}$ based on the scenario; (3) integrate the ODE $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t, \mathbf{c})$ using Euler method with 10 steps. The resulting $\mathbf{z}_1$ serves as the imputed latent representation, enabling complete multi-view fusion and clustering.
+At test time, to impute a missing view for sample $i$, we: (1) sample initial noise $\mathbf{z}_0 \sim \mathcal{N}(0, I)$; (2) construct conditioning $\mathbf{c}$ based on the scenario; (3) integrate the ODE $\frac{d\mathbf{z}_t}{dt} = v_\theta(\mathbf{z}_t, t, \mathbf{c})$ using Euler method with 10 steps. The resulting $\mathbf{z}_1$ serves as the imputed latent representation, enabling complete multi-view fusion and clustering.
 
 \subsection{Soft Clustering}\label{clustering}
 
 We employ soft cluster assignments based on cosine similarity between latent representations $\mathbf{z}_i$ and learnable centroids $\{\boldsymbol{\mu}_k\}_{k=1}^K$:
-\[
+\begin{align}
 q_{ik} = \frac{\exp(\tilde{\mathbf{z}}_i^\top \tilde{\boldsymbol{\mu}}_k / \tau)}{\sum_{j=1}^{K} \exp(\tilde{\mathbf{z}}_i^\top \tilde{\boldsymbol{\mu}}_j / \tau)}
-\]
+\end{align}
 where $\tilde{\mathbf{z}}_i$ and $\tilde{\boldsymbol{\mu}}_k$ are $\ell_2$-normalized. Following the DEC paradigm \cite{xieUnsupervisedDeepEmbedding2016}, we define a sharpened target distribution $P$ and minimize $\mathcal{L}_{clu} = KL(P \| Q)$ to encourage high-confidence assignments.
 
 \subsection{Overall Objective}\label{overall-objective}
 
 The total objective integrates five loss terms:
-\[
-\mathcal{L}_{tot} = \mathcal{L}_{CFM} + \lambda_g \mathcal{L}_{GW} + \lambda_c \mathcal{L}_{clu} + \lambda_r \mathcal{L}_{rec} + \lambda_t \mathcal{L}_{con}
-\]
+\begin{align}
+\mathcal{L}_{tot} = \mathcal{L}_{CFM} +\!\lambda_g \mathcal{L}_{GW} + \lambda_c \mathcal{L}_{clu} + \lambda_r \mathcal{L}_{rec} + \lambda_t \mathcal{L}_{con}
+\end{align}
 where 
 % $\mathcal{L}_{CFM}$ (flow matching), $\mathcal{L}_{GW}$ (structural alignment), and $\mathcal{L}_{clu}$ (soft clustering) are defined in previous sections; 
-$\mathcal{L}_{rec} = \sum_v \|\mathbf{X}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^2$ preserves view-specific information; and $\mathcal{L}_{con}$ (InfoNCE) enhances cross-view consistency for \textbf{aligned data only} (set $\lambda_t=0$ for UMVC). Default hyperparameters: $\lambda_g=0.2$, $\lambda_c=1.0$, $\lambda_r=0.5$, $\lambda_t=0.3$ (aligned) or $0$ (unaligned). Note that all loss components except $\mathcal{L}_{con}$ are active in both aligned and unaligned scenarios; only the flow conditioning source differs (consensus representation for IMVC vs.\ cluster centroid for UMVC). See Table~\ref{tab:loss_config} in the appendix for details.
+$\mathcal{L}_{rec} = \sum_v \|\mathbf{X}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^2$ preserves view-specific information; and $\mathcal{L}_{con}$ (InfoNCE) enhances cross-view consistency for aligned data only (set $\lambda_t=0$ for UMVC). Default hyperparameters: $\lambda_g=0.2$, $\lambda_c=1.0$, $\lambda_r=0.5$, $\lambda_t=0.3$ (aligned) or $0$ (unaligned). Note that all loss components except $\mathcal{L}_{con}$ are active in both aligned and unaligned scenarios; only the flow conditioning source differs (consensus representation for IMVC vs.\ cluster centroid for UMVC). See Table~\ref{tab:loss_config} in the appendix for details.
 
 \subsection{Optimization}\label{optimization}
 
-\textbf{Training Procedure.} We adopt a three-phase training strategy: (1) \textit{Warm-up I}: train encoder-decoder with $\mathcal{L}_{rec}$ to establish a stable latent manifold; (2) \textit{Warm-up II}: initialize centroids via K-Means and apply single-view DEC loss to develop cluster-separable representations; (3) \textit{Joint Training}: end-to-end optimization with $\mathcal{L}_{tot}$, periodically refining centroids via K-Means.
+A three-phase training strategy is adopted: (1) \textit{Warm-up I}: the encoder-decoder is trained with $\mathcal{L}_{rec}$ to establish a stable latent manifold; (2) \textit{Warm-up II}: centroids are initialized via K-Means and single-view DEC loss is applied to develop cluster-separable representations; (3) \textit{Joint Training}: end-to-end optimization with $\mathcal{L}_{tot}$, with centroids periodically refined via K-Means.
 
-\textbf{Implementation.} Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), Euler ODE solver with 10 steps. The complete training procedure is provided in Algorithm~\ref{alg:option} (Appendix).
+For implementation, we use Adam optimizer ($\text{lr}=10^{-3}$), gradient clipping (max norm 1.0), and Euler ODE solver with 10 steps. The complete training procedure is provided in Algorithm~\ref{alg:option} (Appendix).
 
 \section{Experiments}
 \label{sec:experiments}
@@ -224,20 +231,20 @@ $\mathcal{L}_{rec} = \sum_v \|\mathbf{X}^{(v)} - g_{\psi_v}(\mathbf{z}^{(v)})\|^
 \subsection{Experimental Setup}
 \label{subsec:setup}
 
-\textbf{Datasets.} We conduct experiments on five widely used multi-view benchmarks: Bdgp, Coil20, CUB and Nuswide.
+Experiments are conducted on four widely used multi-view benchmarks: Bdgp, Coil20, CUB and Nuswide. Detailed dataset statistics are provided in Table~\ref{tab:dataset_stats} (Appendix~\ref{app:datasets}).
 
-\textbf{Baselines.} We compare OPTION with SOTA Incomplete/Unaligned MVC Incomplete/Unaligned MVC methods, including COMPLETER \cite{linCOMPLETERIncompleteMultiview2021}, SURE \cite{yangRobustMultiViewClustering2023}, DealMVC \cite{yangDealMVCDualContrastive2023}, the diffusion-based DCG \cite{zhangIncompleteMultiviewClustering2025a}, MRG-UMC \cite{xinMultilevelReliableGuidance2025}, CANDY \cite{guoRobustContrastiveMultiview2024}, MFLVC \cite{xuMultilevelFeatureLearning2022}, GCFAggMVC \cite{yanGCFAggGlobalCrossView2023}, FreeCSL \cite{daiImputationfreeAlignmentfreeIncomplete2025a}, ROLL \cite{sunROLLRobustNoisy2025} and PROTOCOL \cite{xuePROTOCOLPartialOptimal2025}.
+OPTION is compared against SOTA Incomplete/Unaligned MVC methods, including COMPLETER \cite{linCOMPLETERIncompleteMultiview2021}, SURE \cite{yangRobustMultiViewClustering2023}, DealMVC \cite{yangDealMVCDualContrastive2023}, the diffusion-based DCG \cite{zhangIncompleteMultiviewClustering2025a}, MRG-UMC \cite{xinMultilevelReliableGuidance2025}, CANDY \cite{guoRobustContrastiveMultiview2024}, MFLVC \cite{xuMultilevelFeatureLearning2022}, GCFAggMVC \cite{yanGCFAggGlobalCrossView2023}, FreeCSL \cite{daiImputationfreeAlignmentfreeIncomplete2025a}, ROLL \cite{sunROLLRobustNoisy2025} and PROTOCOL \cite{xuePROTOCOLPartialOptimal2025}.
 
-\textbf{Implementation Details.} OPTION is implemented in PyTorch. We use an MLP-based encoder-decoder and a conditional flow matching network. The ODE solver uses the Euler method with $N=10$ steps. The hyperparameters $\lambda_{gw}$, $\lambda_{c}$, and $\lambda_{con}$ are tuned via grid search. All experiments are run on a single NVIDIA RTX 3090 GPU. Evaluation metrics include Accuracy (ACC), Normalized Mutual Information (NMI), and Adjusted Rand Index (ARI).
+OPTION is implemented in PyTorch. We use an MLP-based encoder-decoder and a conditional flow matching network. The ODE solver uses the Euler method with $N=10$ steps. The hyperparameters $\lambda_{gw}$, $\lambda_{c}$, and $\lambda_{con}$ are tuned via grid search. All experiments are run on a single NVIDIA RTX 3090 GPU. Evaluation metrics include Accuracy (ACC), Normalized Mutual Information (NMI), and Adjusted Rand Index (ARI).
 
 % ----------------------------------------------------------------------
 \subsection{Clustering Performance}
 \label{subsec:main_results}
 
-We evaluate OPTION under both ideal (complete and aligned) and challenging (incomplete/unaligned) scenarios to comprehensively assess its effectiveness.
+We evaluate OPTION under both ideal (complete and aligned) and challenging (incomplete or unaligned) multi-view scenarios to comprehensively assess its robustness and effectiveness. 
 
 \subsubsection{Incomplete Multi-View Clustering}
-We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Table \ref{tab:robustness_incomplete} shows the clustering accuracy under varying missing rates.
+To simulate missing views, we randomly remove $10\%$ to $70\%$ of the data in each view. Table~\ref{tab:robustness_incomplete} reports clustering accuracy under varying missing rates, from which several trends emerge. As the proportion of missing views increases, the performance of all methods degrades. Nevertheless, OPTION exhibits remarkable stability, with a much slower decline compared to baseline methods. This demonstrates that the proposed Cross-View Flow Matching effectively imputes missing semantics from the available views, preserving clustering quality even under severe incompleteness.
 
 \begin{table*}[t]
 \caption{Clustering performance (ACC, NMI, ARI) under varying missing rates. Best results are \textbf{bolded} and second best are \underline{underlined}.}
@@ -303,12 +310,8 @@ We simulate missing views by randomly removing $10\%$ to $70\%$ of view data. Ta
 \vskip -0.1in
 \end{table*}
 
-
-
-\textbf{Analysis:} As the missing rate increases, the performance of all methods drops. However, OPTION maintains high stability, degrading much slower than baselines. This confirms that our Cross-View Flow Matching effectively imputes missing semantics from available views.
-
 \subsubsection{Unaligned Multi-View Clustering}
-We simulate unaligned scenarios by randomly shuffling the sample indices of one view, with shuffling rates from $0\%$ to $100\%$. Table \ref{tab:robustness_unaligned} presents the clustering accuracy under varying unaligned rates.
+Unaligned scenarios are simulated by randomly shuffling the sample indices of one view, with shuffling rates from $0\%$ to $100\%$. Table~\ref{tab:robustness_unaligned} reports the clustering accuracy under varying unaligned rates, revealing the following patterns.
 
 \begin{table*}[t]
 \caption{Clustering performance (ACC, NMI, ARI) under varying unaligned rates. Best results are \textbf{bolded} and second best are \underline{underlined}.}
@@ -374,7 +377,7 @@ We simulate unaligned scenarios by randomly shuffling the sample indices of one 
 
 
 
-\textbf{Analysis:} Traditional methods fail catastrophically when alignment is lost. OPTION, armed with the Gromov-Wasserstein loss, successfully aligns geometric structures without needing point-wise correspondence, maintaining high accuracy even at high unaligned rates.
+Traditional methods fail catastrophically when alignment is lost. OPTION, equipped with the Gromov-Wasserstein loss, successfully aligns geometric structures without needing point-wise correspondence, maintaining high accuracy even at high unaligned rates.
 
 % ----------------------------------------------------------------------
 \subsection{Ablation Study}
@@ -408,7 +411,7 @@ Full model & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\check
 \vskip -0.1in
 \end{table}
 
-\textbf{Results:} (1) Removing $\mathcal{L}_{contra}$ or $\mathcal{L}_{cluster}$ causes the largest performance drops (ACC $\downarrow$12.2\% and $\downarrow$11.0\%), demonstrating that contrastive learning and clustering supervision are critical for discriminative representations. (2) Removing $\mathcal{L}_{recon}$ degrades ACC by 5.1\%, confirming reconstruction loss helps preserve view-specific information. (3) Removing $\mathcal{L}_{GW}$ or $\mathcal{L}_{flow}$ leads to moderate drops (ACC $\downarrow$1.1--1.2\%), validating their roles in structural alignment and missing-view imputation under challenging conditions.
+Table~\ref{tab:ablation} reveals several important findings. (1) Removing $\mathcal{L}_{contra}$ or $\mathcal{L}_{cluster}$ causes the largest performance drops (ACC $\downarrow$12.2\% and $\downarrow$11.0\%), demonstrating that contrastive learning and clustering supervision are critical for discriminative representations. (2) Removing $\mathcal{L}_{recon}$ degrades ACC by 5.1\%, confirming reconstruction loss helps preserve view-specific information. (3) Removing $\mathcal{L}_{GW}$ or $\mathcal{L}_{flow}$ leads to moderate drops (ACC $\downarrow$1.1--1.2\%), validating their roles in structural alignment and missing-view imputation under challenging conditions.
 
 % ----------------------------------------------------------------------
 \subsection{Sensitivity Analysis}
@@ -442,9 +445,9 @@ We investigate the robustness of OPTION to hyperparameter variations by analyzin
     \caption{Sensitivity analysis of four key hyperparameters on Scene-15 (mean $\pm$ std, 5 runs).}
     \label{fig:sensitivity}
 \end{figure}
-\textbf{Key Findings.} (1) \emph{Overall robustness}: All nine hyperparameters exhibit low sensitivity scores ($S < 0.1$), indicating that OPTION maintains stable clustering performance across a wide range of configurations. Even $\lambda_{gw}$, which shows the largest variation ($S=0.086$), only causes $<9\%$ relative performance change when varied over two orders of magnitude. (2) \emph{Efficient ODE integration}: Performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This allows $5\times$--$10\times$ faster inference compared to diffusion-based alternatives requiring 50--100 steps. (3) \emph{Loss weight stability}: $\lambda_{cluster}$ and $\lambda_{recon}$ show minimal sensitivity ($S \approx 0.05$), confirming that OPTION tolerates a broad range of loss weight configurations without significant performance degradation. (4) \emph{Architecture insensitivity}: Latent dimension, flow hidden dimension, learning rate, and dropout all show very low sensitivity ($S < 0.05$), demonstrating that OPTION's performance stems from its principled formulation rather than architectural tuning.
+Figure~\ref{fig:sensitivity} reveals several key findings. (1) \emph{Overall robustness}: All nine hyperparameters exhibit low sensitivity scores ($S < 0.1$), indicating that OPTION maintains stable clustering performance across a wide range of configurations. Even $\lambda_{gw}$, which shows the largest variation ($S=0.086$), only causes $<9\%$ relative performance change when varied over two orders of magnitude. (2) \emph{Efficient ODE integration}: Performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This allows $5\times$--$10\times$ faster inference compared to diffusion-based alternatives requiring 50--100 steps. (3) \emph{Loss weight stability}: $\lambda_{cluster}$ and $\lambda_{recon}$ show minimal sensitivity ($S \approx 0.05$), confirming that OPTION tolerates a broad range of loss weight configurations without significant performance degradation. (4) \emph{Architecture insensitivity}: Latent dimension, flow hidden dimension, learning rate, and dropout all show very low sensitivity ($S < 0.05$), demonstrating that OPTION's performance stems from its principled formulation rather than architectural tuning.
 
-\textbf{Practical Implications.} The low sensitivity across all hyperparameters suggests that OPTION can be deployed with default settings in most scenarios without extensive tuning. For practitioners, we recommend: $\lambda_{gw} \in [0.05, 0.2]$, $N=10$ ODE steps, $\lambda_{cluster} \in [1.0, 3.0]$, and $\lambda_{recon} \in [0.5, 1.5]$. Complete results for all nine parameters are provided in Appendix~\ref{app:sensitivity}.
+These results have practical implications: the low sensitivity across all hyperparameters suggests that OPTION can be deployed with default settings in most scenarios without extensive tuning. For practitioners, we recommend: $\lambda_{gw} \in [0.05, 0.2]$, $N=10$ ODE steps, $\lambda_{cluster} \in [1.0, 3.0]$, and $\lambda_{recon} \in [0.5, 1.5]$. Complete results for all nine parameters are provided in Appendix~\ref{app:sensitivity}.
 
 % ----------------------------------------------------------------------
 \subsection{Convergence Analysis}
@@ -459,13 +462,13 @@ To demonstrate the optimization stability and convergence properties of OPTION, 
     \label{fig:convergence}
 \end{figure}
 
-\textbf{Statistical Validation.} Our multi-seed experiments demonstrate OPTION's robustness: all clustering metrics (ACC, NMI, ARI) converge to stable values across 5 independent runs, with the shaded regions in Figure~\ref{fig:convergence} indicating consistently low variance. The relatively tight standard deviation bands suggest that OPTION's optimization is reproducible regardless of random initialization, a desirable property for practical deployment.
+The multi-seed experiments demonstrate OPTION's robustness: all clustering metrics (ACC, NMI, ARI) converge to stable values across 5 independent runs, with the shaded regions in Figure~\ref{fig:convergence} indicating consistently low variance. The relatively tight standard deviation bands suggest that OPTION's optimization is reproducible regardless of random initialization, a desirable property for practical deployment.
 
-\textbf{Loss Component Balance.} The bottom panel of Figure~\ref{fig:convergence} shows the evolution of individual loss components. All losses decrease monotonically with small variance bands, indicating: (i) no single objective dominates the optimization; (ii) the multi-task learning is well-balanced across reconstruction ($\mathcal{L}_{recon}$), GW alignment ($\mathcal{L}_{gw}$), and clustering ($\mathcal{L}_{cluster}$) objectives. The tight variance bands confirm that OPTION's optimization landscape is well-conditioned across different random seeds.
+The bottom panel of Figure~\ref{fig:convergence} shows the evolution of individual loss components. All losses decrease monotonically with small variance bands, indicating: (i) no single objective dominates the optimization; (ii) the multi-task learning is well-balanced across reconstruction ($\mathcal{L}_{recon}$), GW alignment ($\mathcal{L}_{gw}$), and clustering ($\mathcal{L}_{cluster}$) objectives. The tight variance bands confirm that OPTION's optimization landscape is well-conditioned across different random seeds.
 
-\textbf{Convergence Speed and Stability.} The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) \emph{Fast convergence}: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) \emph{Smooth trajectories}: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) \emph{Consistent variance}: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds.
+The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) \emph{Fast convergence}: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) \emph{Smooth trajectories}: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) \emph{Consistent variance}: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds.
 
-\textbf{Implications.} These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning.
+These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning.
 
 % ----------------------------------------------------------------------
 \subsection{Visualization}
@@ -523,7 +526,7 @@ CUB & 2.63 & 25.96 & 9.9× \\
 \vskip -0.1in
 \end{table}
 
-\textbf{Analysis:} OPTION achieves $6.4\times$ to $9.9\times$ speedup over DCG (average 8.0×) due to: (1) straight OT paths requiring only 10 ODE steps vs. 100 diffusion denoising iterations; (2) deterministic ODEs vs. stochastic sampling; (3) minimal fixed memory footprint across all datasets. The speedup is remarkably consistent across datasets of varying complexity, demonstrating that flow matching's efficiency advantage is robust to different data characteristics. For practical deployment, this translates to: on a single RTX 3090, OPTION imputes 256-sample batches in approximately 3 ms, enabling real-time clustering updates at over 300 batches/second, whereas DCG requires $\sim$26 ms per batch ($\sim$38 batches/second), making it less suitable for streaming or interactive scenarios.
+Table~\ref{tab:inference_speed} demonstrates that OPTION achieves $6.4\times$ to $9.9\times$ speedup over DCG (average 8.0\texttimes) due to: (1) straight OT paths requiring only 10 ODE steps vs.\ 100 diffusion denoising iterations; (2) deterministic ODEs vs.\ stochastic sampling; (3) minimal fixed memory footprint across all datasets. The speedup is remarkably consistent across datasets of varying complexity, demonstrating that flow matching's efficiency advantage is robust to different data characteristics. For practical deployment, this translates to: on a single RTX 3090, OPTION imputes 256-sample batches in approximately 3 ms, enabling real-time clustering updates at over 300 batches/second, whereas DCG requires $\sim$26 ms per batch ($\sim$38 batches/second), making it less suitable for streaming or interactive scenarios.
 
 % ----------------------------------------------------------------------
 \section{Conclusion}\label{conclusion}
@@ -556,20 +559,20 @@ This paper introduced OPTION, a unified framework for incomplete and unaligned m
 Flow Matching (FM) \cite{lipmanFlowMatchingGenerative2023a} provides a simulation-free framework for learning generative models by directly regressing a vector field that transports samples from a source distribution $p_0$ (typically Gaussian noise) to a target distribution $p_1$ (data). Unlike diffusion models that require iterative stochastic denoising, FM learns a deterministic continuous normalizing flow (CNF) via ordinary differential equations (ODEs).
 
 \textbf{Continuous Normalizing Flow.} Given a time-dependent vector field $u_t: \mathbb{R}^d \times [0,1] \to \mathbb{R}^d$, the flow is defined by the ODE:
-\[
+\begin{align}
 \frac{d\mathbf{z}_t}{dt} = u_t(\mathbf{z}_t), \quad \mathbf{z}_0 \sim p_0, \quad t \in [0, 1]
-\]
+\end{align}
 Solving this ODE forward from $t=0$ to $t=1$ generates samples: $\mathbf{z}_1 = \mathbf{z}_0 + \int_0^1 u_t(\mathbf{z}_t) dt$. The distribution evolves according to the continuity equation $\frac{\partial p_t}{\partial t} + \nabla \cdot (p_t u_t) = 0$, ensuring $p_0$ is transported to $p_1$.
 
 \textbf{Conditional Flow Matching.} Directly learning $u_t$ requires access to $p_t$ at all intermediate times, which is intractable. The Conditional Flow Matching (CFM) objective \cite{lipmanFlowMatchingGenerative2023a} bypasses this by conditioning on data samples $\mathbf{x}_1 \sim p_1$. For each data point $\mathbf{x}_1$, we define a conditional probability path $p_t(\mathbf{z}|\mathbf{x}_1)$ that interpolates between noise $\mathbf{x}_0 \sim \mathcal{N}(0, I)$ and $\mathbf{x}_1$. The conditional vector field $u_t(\mathbf{z}|\mathbf{x}_1)$ generates straight trajectories:
-\begin{align*}
+\begin{align}
 u_t(\mathbf{z}|\mathbf{x}_1) = & \frac{\mathbf{x}_1 - (1-\sigma_{min})\mathbf{x}_0}{1 - (1-\sigma_{min})t} \\
 \quad \mathbf{z}_t = & (1 - (1-\sigma_{min})t)\mathbf{x}_0 + t\mathbf{x}_1    
-\end{align*}
+\end{align}
 where $\sigma_{min} > 0$ is a small regularization constant. The neural network $v_\theta(\mathbf{z}, t)$ is trained via:
-\[
+\begin{align}
 \mathcal{L}_{CFM}(\theta) = \mathbb{E}_{t, \mathbf{x}_1, \mathbf{x}_0, \mathbf{z}_t} \| v_\theta(\mathbf{z}_t, t) - u_t(\mathbf{z}_t|\mathbf{x}_1) \|^2
-\]
+\end{align}
 This enables efficient training without ODE simulation, and at inference, the learned vector field can be integrated using few-step ODE solvers (e.g., 10 Euler steps).
 
 \section{Training Algorithm}
@@ -634,6 +637,50 @@ $\mathcal{L}_{con}$ & \checkmark & $\times$ \\
 \vspace{0.3em}
 \\\footnotesize{The generative CFM loss is always active; only the conditioning source differs.}
 \end{table}
+
+\section{Dataset Details}
+\label{app:datasets}
+
+To comprehensively evaluate the performance of OPTION, we conducted experiments on six widely used multi-view benchmark datasets covering various domains, including generic object recognition, digit classification, biological data analysis, and scene categorization. The statistical statistics of these datasets are summarized in Table~\ref{tab:dataset_stats}. Detailed descriptions of each dataset are provided below.
+
+\begin{table}[!htbp]
+\caption{Statistical summary of the benchmark multi-view datasets used in experiments. $N$: Sample size, $V$: Number of views, $K$: Number of clusters/categories. The View Dimensions column lists the feature dimensionality for each specific view.}
+\label{tab:dataset_stats}
+\vskip 0.1in
+\begin{center}
+\begin{small}
+\begin{sc}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Dataset & $N$ & $V$ & $K$ & View Dimensions \\
+\midrule
+BDGP        & 2,500  & 2 & 5   & [1750, 79] \\
+COIL-20     & 1,440  & 3 & 20  & [1024, 3304, 6750] \\
+CUB         & 11,788 & 2 & 200 & [1024, 300] \\
+Handwritten & 2,000  & 6 & 10  & [240, 76, 216, 47, 64, 6] \\
+NUS-WIDE    & 30,000 & 5 & 31  & [64, 144, 73, 128, 225] \\
+Scene-15    & 4,485  & 3 & 15  & [20, 59, 40] \\
+\bottomrule
+\end{tabular}%
+}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+\textbf{BDGP (Berkeley Drosophila Genome Project).} This is a biological dataset consisting of 2,500 samples belonging to 5 categories of Drosophila embryos. It contains two heterogeneous views: the first view consists of 1,750-dimensional visual features extracted from lateral and dorsal images of the embryos, and the second view comprises 79-dimensional textual features derived from the corresponding gene expression terms. This dataset challenges the model to align visual patterns with semantic biological descriptions.
+
+\textbf{COIL-20 (Columbia Object Image Library).} This dataset contains 1,440 grayscale images of 20 distinct objects (e.g., ducks, cars, cups). Each object was rotated on a turntable through 360 degrees to capture 72 poses. Three views are constructed to represent different visual characteristics: intensity features, LBP (Local Binary Patterns) features, and Gabor features. The dataset tests the model's ability to recognize 3D objects from multi-modal 2D feature descriptors.
+
+\textbf{CUB (Caltech-UCSD Birds-200-2011).} This is a fine-grained image classification dataset containing 11,788 images of 200 bird species. We utilize a multi-view setting composed of deep visual features and textual features. View 1 typically consists of 1,024-dimensional features extracted via a pre-trained deep neural network (e.g., GoogleNet), capturing high-level visual semantics. View 2 consists of 300-dimensional textual features (e.g., Doc2Vec) obtained from the text descriptions associated with each bird class. The large number of categories and fine-grained differences make this a challenging benchmark.
+
+\textbf{Handwritten.} This classic dataset consists of 2,000 samples of handwritten numerals from '0' to '9' (10 classes), with 200 samples per class. It provides a rich multi-view representation using six different feature descriptors: Pixel averages (240-dim), Fourier coefficients (76-dim), Profile correlations (216-dim), Zernike moments (47-dim), Karhunen-Love coefficients (64-dim), and Morphological features (6-dim). The high number of views ($V=6$) makes it suitable for evaluating the scalability of multi-view fusion mechanisms.
+
+\textbf{NUS-WIDE.} This is a large-scale real-world web image dataset collected from Flickr. Following standard protocols in multi-view clustering literature, we use a subset of 30,000 images belonging to 31 frequent object categories. The dataset includes five low-level visual feature views: 64-D Color Histogram, 144-D Color Correlogram, 73-D Edge Direction Histogram, 128-D Wavelet Texture, and 225-D Block-wise Color Moments. This dataset evaluates the model's performance on large-scale, diverse, and potentially noisy web data.
+
+\textbf{Scene-15.} This dataset contains 4,485 images classifying 15 distinct indoor and outdoor scene categories (e.g., bedroom, kitchen, coast, forest). The multi-view features are extracted to capture different aspects of the scene environment. Common views include 20-dimensional GIST features (spatial envelope), 59-dimensional PHOG (Pyramid Histogram of Oriented Gradients) features, and 40-dimensional LBP (Local Binary Patterns) features. It serves as a benchmark for scene understanding and structural feature integration.
 
 \section{Complete Sensitivity Analysis}
 \label{app:sensitivity}
