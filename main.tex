@@ -586,6 +586,8 @@ This enables efficient training without ODE simulation, and at inference, the le
 \section{Training Algorithm}
 \label{app:algorithm}
 
+Algorithm~\ref{alg:option} presents the complete end-to-end training procedure for OPTION. The algorithm follows a three-phase strategy: (1) encoder-decoder pretraining with reconstruction loss to establish a stable latent manifold, (2) centroid initialization via K-Means and single-view DEC pretraining to develop cluster-separable representations, and (3) joint optimization with all loss components. A key distinction is made between aligned (IMVC) and unaligned (UMVC) scenarios: in the aligned setting, the flow conditioning uses consensus representations aggregated across views; in the unaligned setting, each view operates independently with cluster centroid conditioning, as cross-view sample correspondences are unknown.
+
 \begin{algorithm}[!htbp]
   \caption{End-to-End Training for OPTION}
   \label{alg:option}
@@ -624,6 +626,8 @@ This enables efficient training without ODE simulation, and at inference, the le
 
 \section{Loss Configuration}
 \label{app:loss_config}
+
+Table~\ref{tab:loss_config} summarizes the loss function configuration for different multi-view clustering scenarios. The key difference between aligned (IMVC) and unaligned (UMVC) settings lies in two aspects: (1) the flow conditioning source---consensus representation for IMVC versus cluster centroid for UMVC, and (2) the contrastive loss $\mathcal{L}_{con}$, which is only applicable when sample correspondences are known. All other loss components remain active in both scenarios, ensuring that OPTION maintains its core capabilities of generative imputation, structural alignment, and clustering supervision regardless of the alignment assumption.
 
 \begin{table}[!htbp]
 \centering
