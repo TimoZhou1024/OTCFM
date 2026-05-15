@@ -452,7 +452,7 @@ We investigate the robustness of OPTION to hyperparameter variations by analyzin
     \caption{Sensitivity analysis of four key hyperparameters on Scene-15 (mean $\pm$ std, 5 runs).}
     \label{fig:sensitivity}
 \end{figure}
-Figure~\ref{fig:sensitivity} reveals several key findings. (1) \emph{Overall robustness}: All nine hyperparameters exhibit low sensitivity scores ($S < 0.1$), indicating that OPTION maintains stable clustering performance across a wide range of configurations. Even $\lambda_{gw}$, which shows the largest variation ($S=0.086$), only causes $<9\%$ relative performance change when varied over two orders of magnitude. (2) \emph{Efficient ODE integration}: Performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This allows $5\times$--$10\times$ faster inference compared to diffusion-based alternatives requiring 50--100 steps. (3) \emph{Loss weight stability}: $\lambda_{cluster}$ and $\lambda_{recon}$ show minimal sensitivity ($S \approx 0.05$), confirming that OPTION tolerates a broad range of loss weight configurations without significant performance degradation. (4) \emph{Architecture insensitivity}: Latent dimension, flow hidden dimension, learning rate, and dropout all show very low sensitivity ($S < 0.05$), demonstrating that OPTION's performance stems from its principled formulation rather than architectural tuning.
+Figure~\ref{fig:sensitivity} reveals several key findings. (1) Overall robustness: All nine hyperparameters exhibit low sensitivity scores ($S < 0.1$), indicating that OPTION maintains stable clustering performance across a wide range of configurations. Even $\lambda_{gw}$, which shows the largest variation ($S=0.086$), only causes $<9\%$ relative performance change when varied over two orders of magnitude. (2) Efficient ODE integration: Performance saturates at $N=10$ steps with negligible improvement beyond, validating that optimal transport paths enable few-step generation. This allows $5\times$--$10\times$ faster inference compared to diffusion-based alternatives requiring 50--100 steps. (3) Loss weight stability: $\lambda_{cluster}$ and $\lambda_{recon}$ show minimal sensitivity ($S \approx 0.05$), confirming that OPTION tolerates a broad range of loss weight configurations without significant performance degradation. (4) Architecture insensitivity: Latent dimension, flow hidden dimension, learning rate, and dropout all show very low sensitivity ($S < 0.05$), demonstrating that OPTION's performance stems from its principled formulation rather than architectural tuning.
 
 These results have practical implications: the low sensitivity across all hyperparameters suggests that OPTION can be deployed with default settings in most scenarios without extensive tuning. For practitioners, we recommend: $\lambda_{gw} \in [0.05, 0.2]$, $N=10$ ODE steps, $\lambda_{cluster} \in [1.0, 3.0]$, and $\lambda_{recon} \in [0.5, 1.5]$. Complete results for all nine parameters are provided in Appendix~\ref{app:sensitivity}.
 
@@ -473,7 +473,7 @@ The multi-seed experiments demonstrate OPTION's robustness: all clustering metri
 
 The bottom panel of Figure~\ref{fig:convergence} shows the evolution of individual loss components. All losses decrease monotonically with small variance bands, indicating: (i) no single objective dominates the optimization; (ii) the multi-task learning is well-balanced across reconstruction ($\mathcal{L}_{recon}$), GW alignment ($\mathcal{L}_{gw}$), and clustering ($\mathcal{L}_{cluster}$) objectives. The tight variance bands confirm that OPTION's optimization landscape is well-conditioned across different random seeds.
 
-The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) \emph{Fast convergence}: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) \emph{Smooth trajectories}: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) \emph{Consistent variance}: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds. Additional convergence results on COIL-20, CUB, and Scene-15 are provided in Appendix~\ref{app:convergence}.
+The top panel of Figure~\ref{fig:convergence} reveals several favorable optimization properties: (i) Fast convergence: All three clustering metrics (ACC, NMI, ARI) show rapid initial improvement in the first 20 epochs, then gradually stabilize. This is significantly faster than diffusion-based methods that typically require 200+ epochs~\cite{zhangIncompleteMultiviewClustering2025a}. (ii) Smooth trajectories: The mean curves exhibit monotonic improvement with minimal oscillation, suggesting stable gradient flow facilitated by the optimal transport formulation. (iii) Consistent variance: The standard deviation bands remain relatively constant throughout training, indicating that convergence behavior is reproducible across different random seeds. Additional convergence results on COIL-20, CUB, and Scene-15 are provided in Appendix~\ref{app:convergence}.
 
 % These convergence properties have practical significance: the tight variance bands reduce uncertainty in expected performance; the smooth loss trajectories suggest that OPTION's objective landscape is well-conditioned; and the fast convergence enables rapid prototyping and hyperparameter tuning.
 
@@ -484,22 +484,22 @@ The top panel of Figure~\ref{fig:convergence} reveals several favorable optimiza
 
 \begin{figure}[!htbp]
     \centering
-    \begin{subfigure}{0.48\columnwidth}
+    \begin{subfigure}{0.49\columnwidth}
         \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch0.png}
         \caption{Handwritten (Init)}
     \end{subfigure}
-    \begin{subfigure}{0.48\columnwidth}
+    \begin{subfigure}{0.49\columnwidth}
         \includegraphics[width=\linewidth]{figures/handwritten_tsne_epoch100.png}
         \caption{Handwritten (Final)}
     \end{subfigure}
     
-    \vspace{0.5em}
+    \vspace{1.2em}
     
-    \begin{subfigure}{0.48\columnwidth}
+    \begin{subfigure}{0.49\columnwidth}
         \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch0.png}
         \caption{Scene-15 (Init)}
     \end{subfigure}
-    \begin{subfigure}{0.48\columnwidth}
+    \begin{subfigure}{0.49\columnwidth}
         \includegraphics[width=\linewidth]{figures/scene15_tsne_epoch100.png}
         \caption{Scene-15 (Final)}
     \end{subfigure}
@@ -539,6 +539,10 @@ Table~\ref{tab:inference_speed} demonstrates that OPTION achieves $6.4\times$ to
 \section{Conclusion}\label{conclusion}
 
 This paper introduced OPTION, a unified framework for incomplete and unaligned multi-view clustering that integrates optimal transport-guided flow matching with Gromov-Wasserstein structural alignment. By learning deterministic transport paths with only 10 ODE steps, OPTION achieves 8$\times$ speedup over diffusion-based methods while maintaining high imputation fidelity. The GW loss enables alignment-free multi-view fusion without requiring explicit sample correspondences. Extensive experiments demonstrate that OPTION consistently outperforms state-of-the-art methods across ideal, incomplete, and unaligned scenarios with robust hyperparameter stability.
+
+\section*{Impact Statement}
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none of which we feel must be specifically highlighted here.
 
 %\textbf{Limitations.} Future work includes extending to scenarios with noisy views and scaling to settings with many views where pairwise GW computation may become expensive.
 
