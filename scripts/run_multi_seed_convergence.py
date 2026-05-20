@@ -25,7 +25,8 @@ from otcfm.config import (
 )
 from otcfm.datasets import (
     load_scene15, load_handwritten, load_coil20, load_noisy_mnist,
-    load_caltech101, load_cub, MultiViewDataset, create_dataloader
+    load_caltech101, load_cub, load_bdgp, load_nus_wide,
+    MultiViewDataset, create_dataloader
 )
 from otcfm.ot_cfm import OTCFM
 from otcfm.trainer import Trainer
@@ -39,6 +40,10 @@ DATASET_LOADERS = {
     'noisymnist': load_noisy_mnist,
     'caltech101': load_caltech101,
     'cub': load_cub,
+    'bdgp': load_bdgp,
+    'nus_wide': load_nus_wide,
+    'nus-wide': load_nus_wide,
+    'nuswide': load_nus_wide,
 }
 
 

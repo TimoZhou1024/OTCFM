@@ -54,6 +54,7 @@ DATASET_LOADERS = {
     'handwritten': load_handwritten,
     'coil20': load_coil20,
     'nus-wide': load_nus_wide,
+    'nus_wide': load_nus_wide,
     'nuswide': load_nus_wide,
 }
 
@@ -174,8 +175,9 @@ def run_experiment(config: ExperimentConfig) -> Dict:
         lambda_gw=config.model.lambda_gw,
         lambda_cluster=config.model.lambda_cluster,
         lambda_recon=config.model.lambda_recon,
-        lambda_contrastive=config.model.lambda_contrastive,
-        dropout=config.model.dropout
+        lambda_contrastive=0.0 if config.data.unaligned_rate > 0.0 else config.model.lambda_contrastive,
+        dropout=config.model.dropout,
+        is_aligned=config.data.unaligned_rate <= 0.0
     )
     
     # Create trainer
@@ -261,8 +263,9 @@ def run_comparison_experiment(
         lambda_gw=config.model.lambda_gw,
         lambda_cluster=config.model.lambda_cluster,
         lambda_recon=config.model.lambda_recon,
-        lambda_contrastive=config.model.lambda_contrastive,
-        dropout=config.model.dropout
+        lambda_contrastive=0.0 if config.data.unaligned_rate > 0.0 else config.model.lambda_contrastive,
+        dropout=config.model.dropout,
+        is_aligned=config.data.unaligned_rate <= 0.0
     )
     
     trainer = Trainer(

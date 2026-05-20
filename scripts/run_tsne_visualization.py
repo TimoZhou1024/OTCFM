@@ -29,7 +29,7 @@ from otcfm.config import (
 )
 from otcfm.datasets import (
     load_scene15, load_handwritten, load_coil20, load_noisy_mnist,
-    load_caltech101, load_bdgp, MultiViewDataset, create_dataloader
+    load_caltech101, load_bdgp, MultiViewDataset, create_dataloader, load_cub, load_nus_wide
 )
 from otcfm.ot_cfm import OTCFM
 from otcfm.trainer import Trainer
@@ -44,6 +44,8 @@ DATASET_LOADERS = {
     'noisy_mnist': load_noisy_mnist,
     'caltech101': load_caltech101,
     'bdgp': load_bdgp,
+    'cub': load_cub,
+    'nus_wide': load_nus_wide
 }
 
 # Publication-quality color palette

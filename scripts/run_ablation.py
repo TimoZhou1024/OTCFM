@@ -4,18 +4,29 @@ Comprehensive Ablation Study Script for OT-CFM
 This script performs systematic ablation experiments to evaluate the contribution
 of each component in the OT-CFM model.
 
+IMPORTANT: OT-CFM is designed for incomplete (missing views) and unaligned data.
+For meaningful ablation results, use --missing_rate and/or --unaligned_rate to
+simulate these challenging scenarios. On perfect data, components like flow matching
+and GW alignment may not show their full benefit.
+
 Usage:
-    # Run full ablation study on a dataset
-    uv run python scripts/run_ablation.py --dataset Scene15 --epochs 100
+    # Run ablation with 30% missing views (RECOMMENDED for IMVC setting)
+    uv run python scripts/run_ablation.py --dataset Scene15 --missing_rate 0.3
+    
+    # Run ablation with 50% unaligned data (for UMVC setting)
+    uv run python scripts/run_ablation.py --dataset Handwritten --unaligned_rate 0.5
+    
+    # Run ablation with both missing and unaligned data
+    uv run python scripts/run_ablation.py --dataset Coil20 --missing_rate 0.3 --unaligned_rate 0.3
+    
+    # Run on perfect data (NOT RECOMMENDED - may show misleading results)
+    uv run python scripts/run_ablation.py --dataset Scene15 --missing_rate 0.0 --unaligned_rate 0.0
     
     # Run specific ablation modes
     uv run python scripts/run_ablation.py --dataset Handwritten --modes full no_gw no_flow
     
     # Run lambda sensitivity analysis
     uv run python scripts/run_ablation.py --dataset Coil20 --analysis lambda_sensitivity
-    
-    # Run all analysis types
-    uv run python scripts/run_ablation.py --dataset Scene15 --analysis all
 """
 
 import os
@@ -37,6 +48,7 @@ from otcfm.config import ExperimentConfig, get_default_config
 from otcfm.datasets import (
     load_caltech101, load_scene15, load_noisy_mnist,
     load_bdgp, load_synthetic, load_handwritten, load_coil20,
+    load_cub, load_nus_wide,
     MultiViewDataset, create_dataloader
 )
 from otcfm.ot_cfm import OTCFM
@@ -53,6 +65,10 @@ DATASET_LOADERS = {
     'synthetic': load_synthetic,
     'handwritten': load_handwritten,
     'coil20': load_coil20,
+    'cub': load_cub,
+    'nus_wide': load_nus_wide,
+    'nus-wide': load_nus_wide,
+    'nuswide': load_nus_wide,
 }
 
 # All ablation modes
@@ -64,6 +80,9 @@ ALL_ABLATION_MODES = [
     "no_flow",        # Without flow matching
     "no_contrastive", # Without contrastive loss
     "no_recon",       # Without reconstruction loss
+    # Combined ablation modes
+    "no_gw_flow",            # Without GW + Flow (core generative components)
+    "no_cluster_contrastive", # Without Clustering + Contrastive (discriminative learning)
 ]
 
 # Lambda parameters for sensitivity analysis
@@ -78,6 +97,11 @@ LAMBDA_PARAMS = {
 class ComprehensiveAblation:
     """
     Comprehensive ablation study for OT-CFM
+    
+    Note: For meaningful ablation results, use non-zero missing_rate and/or
+    unaligned_rate to test OT-CFM on the challenging scenarios it was designed for.
+    On perfect (complete & aligned) data, components like flow matching and GW
+    alignment may not show their full benefit.
     """
     
     def __init__(
@@ -89,7 +113,9 @@ class ComprehensiveAblation:
         num_runs: int = 3,
         device: str = None,
         save_dir: str = "results/ablation",
-        verbose: bool = True
+        verbose: bool = True,
+        missing_rate: float = 0.3,  # Default: 30% missing views
+        unaligned_rate: float = 0.0  # Default: aligned data (IMVC setting)
     ):
         self.dataset_name = dataset_name
         self.data_root = data_root
@@ -98,6 +124,8 @@ class ComprehensiveAblation:
         self.num_runs = num_runs
         self.verbose = verbose
         self.save_dir = Path(save_dir)
+        self.missing_rate = missing_rate
+        self.unaligned_rate = unaligned_rate
         self.save_dir.mkdir(parents=True, exist_ok=True)
         
         # Auto-detect device
@@ -145,11 +173,17 @@ class ComprehensiveAblation:
             print(f"  Clusters: {self.num_clusters}")
     
     def _create_dataloader(self):
-        """Create data loader"""
+        """Create data loader with missing/unaligned simulation"""
         dataset = MultiViewDataset(
             views=self.views,
-            labels=self.labels
+            labels=self.labels,
+            missing_rate=self.missing_rate,
+            unaligned_rate=self.unaligned_rate
         )
+        
+        if self.verbose and (self.missing_rate > 0 or self.unaligned_rate > 0):
+            print(f"  Data simulation: missing_rate={self.missing_rate:.1%}, unaligned_rate={self.unaligned_rate:.1%}")
+        
         return create_dataloader(dataset, self.batch_size, shuffle=True)
     
     def _create_config(self) -> ExperimentConfig:
@@ -232,7 +266,10 @@ class ComprehensiveAblation:
                     mode_metrics['ari'].append(results['best'].get('ari', 0))
                     
                     if self.verbose:
-                        print(f"ACC={results['best']['acc']:.4f}")
+                        # Print final loss components for debugging
+                        final_losses = results.get('final_losses', {})
+                        loss_str = ", ".join([f"{k}={v:.4f}" for k, v in final_losses.items() if k != 'total'])
+                        print(f"ACC={results['best']['acc']:.4f}, losses: {loss_str}")
                     
                 except Exception as e:
                     print(f"Error: {e}")
@@ -260,7 +297,14 @@ class ComprehensiveAblation:
         return all_results
     
     def _get_model_kwargs_for_mode(self, mode: str) -> Dict:
-        """Get model kwargs based on ablation mode"""
+        """Get model kwargs based on ablation mode
+        
+        Note: Both lambda weights AND ablation_mode are used:
+        - lambda weights: Control the loss magnitude in the model
+        - ablation_mode: Control which loss terms are computed in losses.py
+        
+        For consistency, we set lambda=0 for disabled components.
+        """
         config = self._create_config()
         
         kwargs = {
@@ -279,10 +323,19 @@ class ComprehensiveAblation:
             'lambda_recon': config.model.lambda_recon,
             'lambda_contrastive': config.model.lambda_contrastive,
             'dropout': config.model.dropout,
+            'is_aligned': self.unaligned_rate <= 0.0,
         }
+
+        if self.unaligned_rate > 0.0:
+            kwargs['lambda_contrastive'] = 0.0
         
         # Modify based on mode (set lambda to 0 for disabled components)
+        # Note: ablation_mode in losses.py also checks these, but setting lambda=0
+        # provides an additional safety layer
         if mode == 'no_gw':
+            kwargs['lambda_gw'] = 0.0
+        elif mode == 'no_ot':
+            # no_ot disables GW alignment (the OT component in OT-CFM)
             kwargs['lambda_gw'] = 0.0
         elif mode == 'no_cluster':
             kwargs['lambda_cluster'] = 0.0
@@ -290,6 +343,18 @@ class ComprehensiveAblation:
             kwargs['lambda_recon'] = 0.0
         elif mode == 'no_contrastive':
             kwargs['lambda_contrastive'] = 0.0
+        # Combined ablation modes
+        elif mode == 'no_gw_flow':
+            kwargs['lambda_gw'] = 0.0
+            # no_flow handled by ablation_mode in losses.py
+        elif mode == 'no_cluster_contrastive':
+            kwargs['lambda_cluster'] = 0.0
+            kwargs['lambda_contrastive'] = 0.0
+        # no_flow: handled by ablation_mode in losses.py (disables CFM loss)
+        
+        if self.verbose:
+            print(f"    Lambda weights: gw={kwargs['lambda_gw']:.2f}, cluster={kwargs['lambda_cluster']:.2f}, "
+                  f"recon={kwargs['lambda_recon']:.2f}, contrastive={kwargs['lambda_contrastive']:.2f}")
         
         return kwargs
     
@@ -681,6 +746,12 @@ Examples:
     parser.add_argument('--lambda_values', nargs='+', type=float, default=None,
                         help='Custom lambda values to test')
     
+    # Data simulation options (IMPORTANT for meaningful ablation)
+    parser.add_argument('--missing_rate', type=float, default=0.3,
+                        help='Fraction of missing views (default: 0.3 for IMVC setting)')
+    parser.add_argument('--unaligned_rate', type=float, default=0.0,
+                        help='Fraction of unaligned samples (default: 0.0; use >0 for UMVC)')
+    
     # Output options
     parser.add_argument('--no_plot', action='store_true',
                         help='Disable plotting')
@@ -698,8 +769,22 @@ Examples:
         num_runs=args.num_runs,
         device=args.device,
         save_dir=args.save_dir,
-        verbose=args.verbose
+        verbose=args.verbose,
+        missing_rate=args.missing_rate,
+        unaligned_rate=args.unaligned_rate
     )
+    
+    # Print data simulation info
+    print(f"\n{'='*70}")
+    print(f"Ablation Study Configuration")
+    print(f"{'='*70}")
+    print(f"Dataset: {args.dataset}")
+    print(f"Missing rate: {args.missing_rate:.1%} {'(IMVC setting)' if args.missing_rate > 0 else '(complete data)'}")
+    print(f"Unaligned rate: {args.unaligned_rate:.1%} {'(UMVC setting)' if args.unaligned_rate > 0 else '(aligned data)'}")
+    if args.missing_rate == 0 and args.unaligned_rate == 0:
+        print(f"⚠️  WARNING: Running on perfect data. Consider using --missing_rate 0.3")
+        print(f"   for more meaningful ablation results on incomplete data.")
+    print(f"{'='*70}")
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     

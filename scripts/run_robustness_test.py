@@ -293,6 +293,12 @@ class RobustnessTest:
                 'lambda_contrastive': 0.1,
                 'dropout': 0.1,
             }
+
+        # In UMVC or mixed settings, sample-wise positives are invalid, so
+        # disable the aligned contrastive branch consistently with the paper.
+        if unaligned_rate > 0.0:
+            model_params['lambda_contrastive'] = 0.0
+        model_params['is_aligned'] = unaligned_rate <= 0.0
         
         # Create model
         model = OTCFM(

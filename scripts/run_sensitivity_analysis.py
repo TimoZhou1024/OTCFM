@@ -43,6 +43,7 @@ from otcfm.config import get_default_config
 from otcfm.datasets import (
     load_caltech101, load_scene15, load_noisy_mnist,
     load_bdgp, load_synthetic, load_handwritten, load_coil20,
+    load_cub, load_nus_wide,
     MultiViewDataset, create_dataloader
 )
 from otcfm.ot_cfm import OTCFM
@@ -58,6 +59,10 @@ DATASET_LOADERS = {
     'synthetic': load_synthetic,
     'handwritten': load_handwritten,
     'coil20': load_coil20,
+    'cub': load_cub,
+    'nus_wide': load_nus_wide,
+    'nus-wide': load_nus_wide,
+    'nuswide': load_nus_wide,
 }
 
 # Parameter ranges for sensitivity analysis
@@ -138,6 +143,9 @@ class SensitivityAnalyzer:
             'caltech101': 'caltech101',
             'coil20': 'coil20',
             'bdgp': 'bdgp',
+            'cub': 'cub',
+            'nuswide': 'nus_wide',
+            'nus-wide': 'nus_wide',
             'synthetic': 'synthetic',
         }
         
@@ -191,9 +199,9 @@ class SensitivityAnalyzer:
         # Apply custom parameters
         for key, value in config_dict.items():
             if key.startswith('lambda_'):
-                setattr(config.training, key, value)
+                setattr(config.model, key, value)
             elif key == 'learning_rate':
-                config.training.lr = value
+                config.training.learning_rate = value
             elif key in ['latent_dim', 'flow_hidden_dim', 'ode_steps', 'dropout']:
                 setattr(config.model, key, value)
         
@@ -216,6 +224,10 @@ class SensitivityAnalyzer:
             flow_num_layers=config.model.flow_num_layers,
             time_dim=config.model.time_dim,
             ode_steps=config.model.ode_steps,
+            lambda_gw=config.model.lambda_gw,
+            lambda_cluster=config.model.lambda_cluster,
+            lambda_recon=config.model.lambda_recon,
+            lambda_contrastive=config.model.lambda_contrastive,
             dropout=config.model.dropout,
             sigma_min=1e-4
         )
