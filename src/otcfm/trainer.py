@@ -120,8 +120,14 @@ class Trainer:
             Final metrics dictionary
         """
         # Phase 1: Pretrain encoder-decoder (重建任务)
+        # Skip if ablation mode is no_recon (reconstruction is disabled)
         recon_epochs = pretrain_epochs // 2 if pretrain_epochs > 10 else pretrain_epochs
         dec_epochs = pretrain_epochs - recon_epochs
+        
+        if ablation_mode == "no_recon":
+            if self.verbose:
+                print(f"Phase 1: Skipping reconstruction pretraining (ablation_mode={ablation_mode})")
+            recon_epochs = 0
         
         if recon_epochs > 0:
             if self.verbose:
@@ -166,11 +172,19 @@ class Trainer:
                     print(f"  Recon epoch {epoch+1}/{recon_epochs}, Loss: {avg_loss:.4f}")
         
         # Initialize clustering centroids after reconstruction pretraining
-        if self.verbose:
-            print("Initializing clustering centroids...")
-        self.model.init_clustering(train_loader, self.device)
+        # Skip if ablation mode disables clustering
+        if ablation_mode not in ["no_cluster", "no_recon"]:
+            if self.verbose:
+                print("Initializing clustering centroids...")
+            self.model.init_clustering(train_loader, self.device)
         
         # Phase 2: Single-View DEC pretraining (单视图聚类)
+        # Skip if ablation mode is no_cluster (clustering is disabled)
+        if ablation_mode == "no_cluster":
+            if self.verbose:
+                print(f"Phase 2: Skipping DEC pretraining (ablation_mode={ablation_mode})")
+            dec_epochs = 0
+        
         if dec_epochs > 0:
             if self.verbose:
                 print(f"Phase 2: Single-View DEC pretraining for {dec_epochs} epochs...")
@@ -236,6 +250,11 @@ class Trainer:
             if self.verbose:
                 print("Re-initializing centroids after SV-DEC pretraining...")
             self.model.init_clustering(train_loader, self.device)
+        elif ablation_mode not in ["no_cluster"]:
+            # If dec_epochs=0 but clustering is enabled, still need to initialize centroids
+            if self.verbose:
+                print("Initializing clustering centroids...")
+            self.model.init_clustering(train_loader, self.device)
         
         # Training loop
         best_metrics = {}
@@ -246,7 +265,8 @@ class Trainer:
             self.epoch = epoch
             
             # E-step: Update clustering assignments (at specified frequency)
-            if epoch % self.config.cluster_update_freq == 0 and epoch > 0:
+            # Skip if ablation mode disables clustering
+            if ablation_mode != "no_cluster" and epoch % self.config.cluster_update_freq == 0 and epoch > 0:
                 self._update_clustering(train_loader)
             
             # M-step: Update network parameters
@@ -284,6 +304,14 @@ class Trainer:
         # Final evaluation
         final_metrics = self._evaluate(train_loader, labels)
         
+        # Get final loss components from last training epoch
+        final_losses = {}
+        if training_history:
+            last_epoch = training_history[-1]
+            for k, v in last_epoch.items():
+                if k in ['cfm', 'gw', 'cluster', 'recon', 'contrastive', 'total', 'loss']:
+                    final_losses[k] = v
+        
         # Save training history
         self._save_history(training_history)
         
@@ -297,7 +325,8 @@ class Trainer:
         return {
             'final': final_metrics,
             'best': best_metrics,
-            'history': training_history
+            'history': training_history,
+            'final_losses': final_losses
         }
     
     def _train_epoch(self, dataloader: DataLoader, ablation_mode: str) -> Dict:
@@ -355,7 +384,7 @@ class Trainer:
                 indices = batch['indices']
                 
                 outputs = self.model(views, mask)
-                all_embeddings.append(outputs['consensus'])
+                all_embeddings.append(self.model.select_clustering_embeddings(outputs))
                 all_indices.append(indices)
         
         all_embeddings = torch.cat(all_embeddings, dim=0)
@@ -393,7 +422,7 @@ class Trainer:
             indices = batch['indices']  # 获取样本索引
             
             outputs = self.model(views, mask)
-            all_embeddings.append(outputs['consensus'].cpu())
+            all_embeddings.append(self.model.select_clustering_embeddings(outputs).cpu())
             all_predictions.append(outputs['assignments'].cpu())
             all_indices.append(indices)
         

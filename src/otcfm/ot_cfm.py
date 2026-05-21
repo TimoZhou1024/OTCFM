@@ -42,7 +42,7 @@ class OTCFM(nn.Module):
         ode_steps: int = 10,
         sigma_min: float = 1e-4,
         kernel_type: str = "rbf",
-        kernel_gamma: float = 1.0,
+        kernel_gamma = "auto",  # 'auto' for adaptive median heuristic, or float value
         lambda_gw: float = 0.2,        # 增加 GW 对齐损失
         lambda_cluster: float = 1.0,   # 显著增加聚类损失权重
         lambda_recon: float = 0.5,     # 减少重建损失
@@ -221,11 +221,87 @@ class OTCFM(nn.Module):
         
         return imputed_views
     
+    def _impute_latents(
+        self,
+        latents: List[torch.Tensor],
+        mask: torch.Tensor,
+        consensus: Optional[torch.Tensor] = None
+    ) -> List[torch.Tensor]:
+        """
+        Impute missing view latents using flow matching (ODE solver).
+        
+        This is the CORE function that makes flow matching useful for incomplete data!
+        For samples with missing views, we generate the missing latent by solving
+        the ODE from noise to data, conditioned on available information.
+        
+        Args:
+            latents: List of encoded latents (missing views have bad encoding from zero input)
+            mask: View availability mask [B, V], 1=available, 0=missing
+            consensus: Consensus embedding (for aligned data), or None (for unaligned)
+        
+        Returns:
+            imputed_latents: List with missing latents replaced by flow-generated ones
+        """
+        device = latents[0].device
+        batch_size = latents[0].shape[0]
+        
+        # Determine conditioning for imputation
+        if self.is_aligned and consensus is not None:
+            # Aligned data: condition on consensus of available views
+            condition = consensus
+        else:
+            # Unaligned data: use cluster centroids
+            # First get assignments from available latents
+            available_latents = []
+            for v in range(self.num_views):
+                view_available = mask[:, v].bool()
+                if view_available.any():
+                    available_latents.append(latents[v])
+            
+            if available_latents:
+                # Average available view latents to find cluster assignment
+                # Note: for unaligned data this is per-sample, not cross-sample
+                pseudo_z = torch.stack(available_latents, dim=1).mean(dim=1)
+                q, _ = self.clustering(pseudo_z)
+                assignments = q.argmax(dim=1)
+                condition = self.clustering.centroids[assignments]
+            else:
+                # No views available: use random cluster centroid
+                random_idx = torch.randint(0, self.num_clusters, (batch_size,), device=device)
+                condition = self.clustering.centroids[random_idx]
+        
+        imputed_latents = []
+        for v in range(self.num_views):
+            view_mask = mask[:, v].bool()  # [B]
+            
+            if view_mask.all():
+                # All samples have this view - no imputation needed
+                imputed_latents.append(latents[v])
+            else:
+                # Some samples missing this view - need imputation
+                imputed_z = latents[v].clone()
+                missing_idx = ~view_mask
+                
+                if missing_idx.any():
+                    num_missing = missing_idx.sum().item()
+                    # Sample from prior (noise)
+                    z0 = torch.randn(num_missing, self.latent_dim, device=device)
+                    cond = condition[missing_idx]
+                    
+                    # Solve ODE: p_0 (noise) -> p_1 (data), conditioned on available info
+                    z1 = self.ode_solver.solve(z0, cond)
+                    imputed_z[missing_idx] = z1
+                
+                imputed_latents.append(imputed_z)
+        
+        return imputed_latents
+
     def forward(
         self,
         views: List[torch.Tensor],
         mask: Optional[torch.Tensor] = None,
-        return_all: bool = False
+        return_all: bool = False,
+        use_flow_imputation: bool = True  # NEW: control flow-based imputation
     ) -> Dict:
         """
         Forward pass
@@ -234,6 +310,7 @@ class OTCFM(nn.Module):
             views: List of view tensors
             mask: View availability mask
             return_all: Whether to return all intermediate results
+            use_flow_imputation: Whether to use flow matching for missing view imputation
         
         Returns:
             Dictionary with outputs
@@ -244,8 +321,20 @@ class OTCFM(nn.Module):
         if mask is None:
             mask = torch.ones(batch_size, self.num_views, device=device)
         
-        # Encode views
+        # Check if any views are missing
+        has_missing = (mask < 1).any()
+        
+        # Step 1: Encode available views
         latents, consensus = self.encode(views, mask)
+        
+        # Step 2: Impute missing views using flow matching (if enabled and needed)
+        if has_missing and use_flow_imputation:
+            latents = self._impute_latents(latents, mask, consensus)
+            # Recompute consensus after imputation (for aligned data)
+            if self.is_aligned:
+                # After imputation, we have all views - use uniform weighting
+                full_mask = torch.ones_like(mask)
+                consensus = self.encoder_decoder.fuse_latents(latents, full_mask)
         
         # For unaligned data, we need an alternative to consensus
         if consensus is None:
@@ -324,7 +413,11 @@ class OTCFM(nn.Module):
             loss: Total loss
             loss_dict: Dictionary of individual losses
         """
-        outputs = self.forward(views, mask, return_all=True)
+        # CRITICAL: For no_flow mode, disable flow-based imputation
+        # This tests whether flow matching helps with incomplete data
+        use_flow_imputation = (ablation_mode != "no_flow")
+        
+        outputs = self.forward(views, mask, return_all=True, use_flow_imputation=use_flow_imputation)
         
         # Get per_view_conditions if available (for unaligned case)
         per_view_conditions = outputs.get('per_view_conditions', None)
@@ -347,7 +440,8 @@ class OTCFM(nn.Module):
     def get_cluster_assignments(
         self,
         views: List[torch.Tensor],
-        mask: Optional[torch.Tensor] = None
+        mask: Optional[torch.Tensor] = None,
+        use_flow_imputation: bool = True
     ) -> np.ndarray:
         """
         Get hard cluster assignments
@@ -355,20 +449,34 @@ class OTCFM(nn.Module):
         Args:
             views: List of view tensors
             mask: View availability mask
+            use_flow_imputation: Whether to use flow for missing views
         
         Returns:
             Cluster assignments as numpy array
         """
         self.eval()
         with torch.no_grad():
-            outputs = self.forward(views, mask)
+            outputs = self.forward(views, mask, use_flow_imputation=use_flow_imputation)
             assignments = outputs['assignments'].cpu().numpy()
         return assignments
+
+    def select_clustering_embeddings(self, outputs: Dict) -> torch.Tensor:
+        """
+        Select the embedding tensor used for centroid initialization,
+        centroid updates, and metric computation.
+
+        Unaligned batches intentionally do not have a valid cross-view
+        consensus, so fall back to the first view's latent representation.
+        """
+        if outputs.get('consensus') is not None:
+            return outputs['consensus']
+        return outputs['latents'][0]
     
     def get_embeddings(
         self,
         views: List[torch.Tensor],
-        mask: Optional[torch.Tensor] = None
+        mask: Optional[torch.Tensor] = None,
+        use_flow_imputation: bool = True
     ) -> np.ndarray:
         """
         Get embeddings for clustering
@@ -380,19 +488,15 @@ class OTCFM(nn.Module):
         Args:
             views: List of view tensors
             mask: View availability mask
+            use_flow_imputation: Whether to use flow for missing views
         
         Returns:
             Embeddings as numpy array
         """
         self.eval()
         with torch.no_grad():
-            outputs = self.forward(views, mask)
-            if outputs['consensus'] is not None:
-                # Aligned: use consensus
-                embeddings = outputs['consensus'].cpu().numpy()
-            else:
-                # Unaligned: use first view's latent (no valid cross-view consensus)
-                embeddings = outputs['latents'][0].cpu().numpy()
+            outputs = self.forward(views, mask, use_flow_imputation=use_flow_imputation)
+            embeddings = self.select_clustering_embeddings(outputs).cpu().numpy()
         return embeddings
     
     def init_clustering(self, dataloader, device: str = 'cuda'):
@@ -411,10 +515,11 @@ class OTCFM(nn.Module):
             for batch in dataloader:
                 views = [v.to(device) for v in batch['views']]
                 mask = batch['mask'].to(device)
-                indices = batch['indices']
+                # Support both 'indices' and 'index' keys for compatibility
+                indices = batch.get('indices', batch.get('index'))
                 
                 outputs = self.forward(views, mask)
-                all_embeddings.append(outputs['consensus'].cpu())
+                all_embeddings.append(self.select_clustering_embeddings(outputs).cpu())
                 all_indices.append(indices)
         
         all_embeddings = torch.cat(all_embeddings, dim=0)
@@ -502,7 +607,7 @@ class OTCFMTrainer:
                 indices = batch['indices']
                 
                 outputs = self.model(views, mask)
-                all_embeddings.append(outputs['consensus'])
+                all_embeddings.append(self.model.select_clustering_embeddings(outputs))
                 all_indices.append(indices)
         
         all_embeddings = torch.cat(all_embeddings, dim=0)
@@ -542,7 +647,7 @@ class OTCFMTrainer:
             indices = batch['indices']
             
             outputs = self.model(views, mask)
-            all_embeddings.append(outputs['consensus'].cpu())
+            all_embeddings.append(self.model.select_clustering_embeddings(outputs).cpu())
             all_predictions.append(outputs['assignments'].cpu())
             all_indices.append(indices)
         
