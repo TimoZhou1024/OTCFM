@@ -80,9 +80,9 @@ class GromovWassersteinLoss(nn.Module):
     
     def __init__(
         self,
-        kernel_type: str = "rbf",
-        gamma: float = 1.0,
-        normalize: bool = True
+        kernel_type: str = "cosine",  # Changed from rbf for better numerical stability
+        gamma: str = "auto",  # 'auto' for adaptive, or float value
+        normalize: bool = False  # Disabled to preserve discriminative structure
     ):
         super().__init__()
         self.kernel_type = kernel_type
@@ -101,17 +101,44 @@ class GromovWassersteinLoss(nn.Module):
         """
         if self.kernel_type == "rbf":
             # RBF kernel: K(x, y) = exp(-gamma * ||x - y||^2)
+            # Use adaptive gamma based on median distance for numerical stability
             dist = torch.cdist(Z, Z)
-            K = torch.exp(-self.gamma * dist ** 2)
+            if self.gamma == 'auto':
+                # Median heuristic for gamma
+                positive_dist = dist[(dist > 0) & torch.isfinite(dist)]
+                if positive_dist.numel() == 0:
+                    gamma = torch.tensor(
+                        1.0 / max(Z.shape[1], 1),
+                        dtype=Z.dtype,
+                        device=Z.device
+                    )
+                else:
+                    median_dist = torch.median(positive_dist)
+                    if not torch.isfinite(median_dist) or median_dist <= 0:
+                        gamma = torch.tensor(
+                            1.0 / max(Z.shape[1], 1),
+                            dtype=Z.dtype,
+                            device=Z.device
+                        )
+                    else:
+                        gamma = 1.0 / (2 * median_dist ** 2 + 1e-8)
+            else:
+                # Scale gamma by latent dimension for stability
+                gamma = self.gamma / Z.shape[1]
+            K = torch.exp(-gamma * dist ** 2)
         
         elif self.kernel_type == "cosine":
-            # Cosine similarity
+            # Cosine similarity - works well for high-dimensional spaces
             Z_norm = F.normalize(Z, dim=-1)
             K = Z_norm @ Z_norm.T
+            # Shift to [0, 1] range
+            K = (K + 1) / 2
         
         elif self.kernel_type == "linear":
             # Linear kernel: K(x, y) = x^T y
-            K = Z @ Z.T
+            # Normalize to avoid scale issues
+            Z_norm = F.normalize(Z, dim=-1)
+            K = Z_norm @ Z_norm.T
         
         else:
             raise ValueError(f"Unknown kernel type: {self.kernel_type}")
@@ -120,7 +147,7 @@ class GromovWassersteinLoss(nn.Module):
             # Normalize to [0, 1]
             K = (K - K.min()) / (K.max() - K.min() + 1e-8)
         
-        return K
+        return torch.nan_to_num(K, nan=0.0, posinf=1.0, neginf=0.0)
     
     def forward(self, latents: List[torch.Tensor]) -> torch.Tensor:
         """
@@ -431,7 +458,7 @@ class OTCFMLoss(nn.Module):
         self,
         sigma_min: float = 1e-4,
         kernel_type: str = "rbf",
-        kernel_gamma: float = 1.0,
+        kernel_gamma = "auto",  # 'auto' for adaptive median heuristic, or float value
         lambda_gw: float = 0.1,
         lambda_cluster: float = 0.5,
         lambda_recon: float = 1.0,
@@ -540,7 +567,7 @@ class OTCFMLoss(nn.Module):
             loss_dict['cluster'] = 0.0
         
         # Reconstruction loss
-        if x_original is not None and x_recon is not None:
+        if ablation_mode != "no_recon" and x_original is not None and x_recon is not None:
             loss_recon = self.recon_loss(x_original, x_recon, mask)
             loss_dict['recon'] = loss_recon.item()
         else:
@@ -549,7 +576,7 @@ class OTCFMLoss(nn.Module):
         
         # Contrastive loss - ONLY for aligned data where sample correspondences are known
         # For UMVC (unaligned), this loss is disabled (lambda_contrastive = 0)
-        if self.lambda_contrastive > 0 and self.is_aligned and consensus is not None:
+        if ablation_mode != "no_contrastive" and self.lambda_contrastive > 0 and self.is_aligned and consensus is not None:
             loss_contrastive = self.contrastive_loss(latents)
             loss_dict['contrastive'] = loss_contrastive.item()
         else:

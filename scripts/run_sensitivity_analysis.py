@@ -224,6 +224,8 @@ class SensitivityAnalyzer:
             flow_num_layers=config.model.flow_num_layers,
             time_dim=config.model.time_dim,
             ode_steps=config.model.ode_steps,
+            kernel_type=config.model.kernel_type,
+            kernel_gamma=config.model.kernel_gamma,
             lambda_gw=config.model.lambda_gw,
             lambda_cluster=config.model.lambda_cluster,
             lambda_recon=config.model.lambda_recon,
@@ -235,8 +237,13 @@ class SensitivityAnalyzer:
         # Train
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = Trainer(model, config.training, tmpdir)
-            trainer.quiet = not self.verbose
+            trainer = Trainer(
+                model=model,
+                config=config.training,
+                experiment_dir=tmpdir,
+                device=self.device,
+                verbose=self.verbose
+            )
             results = trainer.train(train_loader, self.labels)
         
         return results['final']
